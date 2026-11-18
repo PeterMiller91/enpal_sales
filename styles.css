@@ -127,3 +127,29 @@ footer.actions.stack { flex-direction: column; }
 .legend .lg { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; }
 .legend .lg:first-child { margin-left: 0; }
 .lg.green { background: #16A34A; } .lg.yellow { background: #EAB308; } .lg.red { background: #DC2626; }
+
+/* Wischen: rechts archivieren, links löschen */
+.swipe { touch-action: pan-y; }
+.swipe-track { position: relative; border-radius: 10px; overflow: hidden; }
+.swipe .customer { position: relative; z-index: 1; transition: transform .2s ease; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.swipe.dragging .customer { transition: none; }
+.swipe-bg { position: absolute; inset: 0; display: none; align-items: center; gap: 8px; padding: 0 18px; font-size: 14px; font-weight: 700; color: #fff; }
+.swipe-bg.archive { background: #475569; justify-content: flex-start; }
+.swipe-bg.delete { background: #B91C1C; justify-content: flex-end; }
+.swipe.show-archive .swipe-bg.archive, .swipe.show-delete .swipe-bg.delete { display: flex; }
+.swipe.armed .swipe-bg.archive { background: #1E293B; }
+.swipe.armed .swipe-bg.delete { background: #7F1D1D; }
+/* Tastatur-Alternative: Knöpfe erscheinen, wenn die Zeile per Tab fokussiert wird */
+.swipe-keys { display: none; gap: 8px; padding: 8px 0 2px; justify-content: flex-end; }
+.swipe:focus-within .swipe-keys { display: flex; }
+@media (hover: hover) and (pointer: fine) { .swipe:hover .swipe-keys { display: flex; } }
+.btn.danger-solid { background: #B91C1C; border-color: #B91C1C; color: #fff; }
+.archive-box summary { display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; min-height: 32px; }
+.archive-box summary::-webkit-details-marker { display: none; }
+.archive-box:not([open]) { gap: 0; }
+dialog.sheet { border: 0; border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); margin: auto auto 0; width: 100%; max-width: 640px; box-sizing: border-box; }
+dialog.sheet::backdrop { background: rgba(20, 32, 29, .45); }
+dialog.sheet h2 { font-size: 18px; margin-bottom: 6px; }
+dialog.sheet .sub { margin: 0 0 16px; line-height: 1.4; }
+.sheet-actions { display: flex; gap: 10px; }
+.sheet-actions .btn { flex: 1; }

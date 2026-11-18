@@ -76,6 +76,8 @@
     warn: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
     folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
     play: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
+    archive: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/>',
+    restore: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
   };
   const icon = (name, size = 16) =>
     `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -797,7 +799,14 @@
         const st = checkStatus(c);
         // Open the first missing step; complete checks open the summary.
         const target = !c.customer.name ? 'kunde' : st.firstMissing ? `step/${st.firstMissing}` : 'abschluss';
-        const html = `<a class="customer ${st.level}" href="#/check/${c.id}/${target}">
+        const name = c.customer.name || 'Ohne Namen';
+        const archived = !!c.archived;
+        // Swipe row: dragging right reveals "Archivieren"/"Wiederherstellen", dragging left reveals "Löschen".
+        const html = `<div class="swipe" data-swipe="${c.id}" data-name="${esc(name)}" data-archived="${archived ? 1 : 0}">
+          <div class="swipe-track">
+          <div class="swipe-bg archive" aria-hidden="true">${icon(archived ? 'restore' : 'archive', 20)}<span>${archived ? 'Wiederherstellen' : 'Archivieren'}</span></div>
+          <div class="swipe-bg delete" aria-hidden="true"><span>Löschen</span>${icon('trash', 20)}</div>
+          <a class="customer ${st.level}" href="#/check/${c.id}/${target}" draggable="false">
           <span class="dot" aria-hidden="true"></span>
           <div class="grow">
             <div class="title">${esc(c.customer.name || 'Ohne Namen')}</div>
@@ -805,13 +814,21 @@
             ${st.missing.length ? `<div class="small missing">Fehlt: ${esc(st.missing.join(', '))}</div>` : ''}
             ${pending ? `<div class="small">${pending} Datei(en) noch nicht hochgeladen</div>` : ''}
           </div>
-          <span class="status"><span class="badge">${st.label}</span><span class="count">${st.done}/6</span></span></a>`;
-        return { level: st.level, html };
+          <span class="status"><span class="badge">${st.label}</span><span class="count">${st.done}/6</span></span></a>
+          </div>
+          <div class="swipe-keys">
+            <button class="btn small" data-action="row-archive" data-id="${c.id}">${archived ? 'Wiederherstellen' : 'Archivieren'}<span class="visually-hidden">: ${esc(name)}</span></button>
+            <button class="btn small danger" data-action="row-delete" data-id="${c.id}">Löschen<span class="visually-hidden">: ${esc(name)}</span></button>
+          </div>
+        </div>`;
+        return { level: st.level, archived, html };
       })
     );
     const order = { red: 0, yellow: 1, green: 2 };
-    const open = rows.filter((r) => r.level !== 'green').sort((a, b) => order[a.level] - order[b.level]);
-    const complete = rows.filter((r) => r.level === 'green');
+    const active = rows.filter((r) => !r.archived);
+    const archivedRows = rows.filter((r) => r.archived);
+    const open = active.filter((r) => r.level !== 'green').sort((a, b) => order[a.level] - order[b.level]);
+    const complete = active.filter((r) => r.level === 'green');
     $app.innerHTML = `
       <header class="bar"><span class="kicker">Baubarkeits-Check</span><h1>Hauptmenü</h1></header>
       <main>
@@ -819,9 +836,13 @@
         <section class="card"><div class="row"><h2>Offene Kunden</h2><span class="small-muted">${open.length}</span></div>
           ${open.length ? `<div class="customers">${open.map((r) => r.html).join('')}</div>` : '<p class="sub">Keine offenen Kunden.</p>'}
           <p class="legend"><span class="lg green"></span>vollständig <span class="lg yellow"></span>etwas fehlt <span class="lg red"></span>ungenügend</p>
+          ${rows.length ? '<p class="legend">Wischen: nach rechts → archivieren, nach links ← löschen</p>' : ''}
         </section>
         ${complete.length ? `<section class="card"><div class="row"><h2>Vollständig</h2><span class="small-muted">${complete.length}</span></div>
           <div class="customers">${complete.map((r) => r.html).join('')}</div></section>` : ''}
+        ${archivedRows.length ? `<details class="card archive-box"><summary><h2>Archiv</h2><span class="small-muted">${archivedRows.length}</span></summary>
+          <div class="customers">${archivedRows.map((r) => r.html).join('')}</div>
+          <p class="legend">Wischen: nach rechts → wiederherstellen, nach links ← löschen</p></details>` : ''}
         ${auth.user ? `<p class="sub">Angemeldet als ${esc(auth.user)} · <button class="btn small" data-action="logout">Abmelden</button></p>` : ''}
       </main>
       <footer class="actions"><button class="btn primary big" data-action="new">Neuer Check</button></footer>`;
@@ -1094,6 +1115,137 @@
     }
   }
 
+  // ---------------------------------------------------------------- swipe: archive / delete
+
+  /** Confirmation sheet; resolves true/false. Falls back to confirm() without <dialog>. */
+  function confirmSheet({ title, text, ok, danger }) {
+    if (typeof HTMLDialogElement === 'undefined') return Promise.resolve(confirm(`${title}\n\n${text}`));
+    return new Promise((resolve) => {
+      const d = document.createElement('dialog');
+      d.className = 'sheet';
+      d.innerHTML = `<form method="dialog">
+        <h2>${esc(title)}</h2><p class="sub">${esc(text)}</p>
+        <div class="sheet-actions">
+          <button class="btn big" value="cancel">Abbrechen</button>
+          <button class="btn big ${danger ? 'danger-solid' : 'primary'}" value="ok">${esc(ok)}</button>
+        </div></form>`;
+      document.body.appendChild(d);
+      d.addEventListener('close', () => {
+        resolve(d.returnValue === 'ok');
+        d.remove();
+      });
+      d.addEventListener('click', (e) => e.target === d && d.close('cancel')); // tap on backdrop
+      d.showModal();
+    });
+  }
+
+  async function archiveCheck(id, name, archived) {
+    const ok = await confirmSheet(
+      archived
+        ? { title: 'Wiederherstellen?', text: `„${name}“ wieder in die Kundenliste übernehmen?`, ok: 'Wiederherstellen' }
+        : { title: 'Archivieren?', text: `„${name}“ ins Archiv verschieben? Die Daten bleiben erhalten und lassen sich wiederherstellen.`, ok: 'Archivieren' }
+    );
+    if (!ok) return false;
+    const c = await DB.getCheck(id);
+    if (!c) return false;
+    c.archived = !archived;
+    c.dirty = true;
+    c.updatedAt = new Date().toISOString();
+    await DB.putCheck(c);
+    scheduleSync();
+    toast(archived ? 'Wiederhergestellt' : 'Archiviert');
+    return true;
+  }
+
+  async function deleteCheck(id, name) {
+    const media = await DB.mediaForCheck(id);
+    const pending = media.filter((m) => !m.uploaded).length;
+    const ok = await confirmSheet({
+      title: 'Kunde löschen?',
+      text:
+        `„${name}“ wird mit allen Fotos und Videos von diesem Gerät gelöscht.` +
+        (pending ? ` Achtung: ${pending} Datei(en) sind noch nicht hochgeladen und gehen verloren!` : ' Bereits hochgeladene Dateien bleiben im Kundenordner auf dem Server.') +
+        ' Das kann nicht rückgängig gemacht werden.',
+      ok: 'Endgültig löschen',
+      danger: true,
+    });
+    if (!ok) return false;
+    for (const m of media) await DB.deleteMedia(m.id);
+    await DB.deleteCheck(id);
+    toast('Gelöscht');
+    return true;
+  }
+
+  let drag = null;
+  const SWIPE_THRESHOLD = 0.35; // share of the row width
+
+  $app.addEventListener('pointerdown', (e) => {
+    const row = e.target.closest('.swipe');
+    if (!row || e.button > 0 || e.target.closest('button')) return;
+    drag = { row, card: row.querySelector('.customer'), x: e.clientX, y: e.clientY, dx: 0, active: false, id: e.pointerId };
+  });
+
+  $app.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (!drag.active) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        drag = null; // vertical scroll
+        return;
+      }
+      if (Math.abs(dx) < 10) return;
+      drag.active = true;
+      drag.row.classList.add('dragging');
+      try {
+        drag.row.setPointerCapture(e.pointerId);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    drag.dx = dx;
+    drag.card.style.transform = `translateX(${dx}px)`;
+    const w = drag.row.offsetWidth;
+    drag.row.classList.toggle('show-archive', dx > 0);
+    drag.row.classList.toggle('show-delete', dx < 0);
+    drag.row.classList.toggle('armed', Math.abs(dx) > w * SWIPE_THRESHOLD);
+  });
+
+  async function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    if (!d.active) return;
+    d.row.dataset.justDragged = '1';
+    setTimeout(() => delete d.row.dataset.justDragged, 400);
+    const w = d.row.offsetWidth;
+    const { swipe: id, name, archived } = d.row.dataset;
+    let changed = false;
+    if (Math.abs(d.dx) > w * SWIPE_THRESHOLD && e.type === 'pointerup') {
+      d.card.style.transform = `translateX(${d.dx > 0 ? w : -w}px)`;
+      changed = d.dx > 0 ? await archiveCheck(id, name, archived === '1') : await deleteCheck(id, name);
+    }
+    if (changed) return render();
+    d.row.classList.remove('dragging', 'armed');
+    d.card.style.transform = '';
+    setTimeout(() => d.row.classList.remove('show-archive', 'show-delete'), 200);
+  }
+  $app.addEventListener('pointerup', endDrag);
+  $app.addEventListener('pointercancel', endDrag);
+
+  // A swipe must not also open the customer.
+  $app.addEventListener(
+    'click',
+    (e) => {
+      const row = e.target.closest('.swipe');
+      if (row && row.dataset.justDragged) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+    true
+  );
+
   // ---------------------------------------------------------------- routing
 
   async function render() {
@@ -1233,6 +1385,14 @@
         save();
         render();
         break;
+      case 'row-archive':
+      case 'row-delete': {
+        const row = btn.closest('.swipe');
+        const { name, archived } = row.dataset;
+        const changed = a === 'row-archive' ? await archiveCheck(btn.dataset.id, name, archived === '1') : await deleteCheck(btn.dataset.id, name);
+        if (changed) render();
+        break;
+      }
       case 'home':
         await save({ immediate: true });
         location.hash = '#/';
