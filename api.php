@@ -27,11 +27,13 @@ $parts = $route === '' ? [] : explode('/', $route);
 
 if ($route === 'config' && $method === 'GET') {
     $user = current_user($config);
+    $storage = $user ? storage_status($config) : ['ok' => null, 'error' => null];
     json_out([
         'companyName' => $config['company_name'],
         'minWidthCm' => (float)$config['min_width_cm'],
         'user' => $user,
-        'storageOk' => $user ? storage_ok($config) : null,
+        'storageOk' => $storage['ok'],
+        'storageError' => $storage['error'],
     ]);
 }
 

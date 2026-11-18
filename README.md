@@ -65,15 +65,22 @@ Standardmäßig **neben** dem Dokumentstamm. Per FTP sieht man die Daten, über 
     └── K-2026-0412_Familie_Beispiel/     ← Kunden-Nr. + Name
         └── 2026-11-17/                   ← Termin-Datum
             ├── check.json                ← alle Daten & Maße
-            ├── 1_heizkoerper/HK1_Wohnzimmer_Gesamt_ab12cd34.jpg
-            ├── 3_heizraum/Heizraum_360_….mp4  (+ _vorschau.jpg)
-            ├── 4_weg/Engstelle1_Kellertuer_….jpg
-            ├── 5_hausseiten/Hausseite_Ost_….jpg
-            ├── 6_unterlagen/Bauplan_….jpg
+            ├── 1_heizkoerper/Familie_Beispiel_2026-11-17_14-32_HK1_Wohnzimmer_Gesamt_ab12cd34.jpg
+            ├── 3_heizraum/Familie_Beispiel_2026-11-17_14-40_Heizraum_360_….mp4  (+ _vorschau.jpg)
+            ├── 4_weg/Familie_Beispiel_2026-11-17_14-45_Engstelle1_Kellertuer_….jpg
+            ├── 5_hausseiten/Familie_Beispiel_2026-11-17_15-02_Hausseite_Ost_….jpg
+            ├── 6_unterlagen/Familie_Beispiel_2026-11-17_15-10_Bauplan_….jpg
             └── Bericht_K-2026-0412_Familie_Beispiel_2026-11-17.pdf
 ```
 
-Einen anderen Ort stellt man in `config.php` mit `data_dir` ein. Der Ordner wird beim ersten Speichern automatisch angelegt.
+Dateinamen: `<Kunde>_<Datum>_<Uhrzeit der Aufnahme>_<Bezeichnung>_<ID>`. So bleiben Fotos auch nach dem Herauskopieren eindeutig zuzuordnen.
+
+Einen anderen Ort stellt man in `config.php` mit `data_dir` ein.
+
+**Meldung „Server-Speicher nicht bereit“?** Die App nennt den genauen Grund und Pfad. Meist hilft:
+1. Per FTP den Ordner anlegen (z. B. `/baubarkeits-daten/kunden`). Der FTP-Benutzer ist bei Plesk derselbe wie der PHP-Benutzer, PHP darf den Ordner dann beschreiben.
+2. Falls nötig, die Rechte des Ordners im FTP-Programm auf `775` setzen.
+3. Heißt es „außerhalb des für PHP erlaubten Bereichs“, in `config.php` einen Pfad innerhalb des genannten Bereichs eintragen. Bei Netcup ist das meist `/var/www/vhosts/<domain>/…`.
 
 ## Updates
 

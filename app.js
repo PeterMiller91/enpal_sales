@@ -760,7 +760,7 @@
       const c = await apiFetch('config');
       serverConfig = c;
       auth.user = c.user || null;
-      if (c.user && c.storageOk === false) toast('Server: Datenordner nicht beschreibbar – bitte config.php prüfen', 6000);
+      if (c.user && c.storageOk === false) toast(c.storageError || 'Server: Datenordner nicht beschreibbar', 12000);
     } catch (e) {
       if (e.status >= 500) toast(e.message, 6000);
     }
@@ -783,6 +783,7 @@
     $app.innerHTML = `
       <header class="bar"><span class="kicker">Baubarkeits-Check</span><h1>Vor-Ort-Termine</h1></header>
       <main>
+        ${serverConfig.storageOk === false ? `<div class="hint warn" role="alert">${icon('warn')}<span><strong>Server-Speicher nicht bereit:</strong> ${esc(serverConfig.storageError || '')}</span></div>` : ''}
         <section class="card"><h2>Meine Termine auf diesem Gerät</h2>
           ${items.length ? `<div class="list">${items.join('')}</div>` : '<p class="sub">Noch keine Termine. Starte einen neuen Check.</p>'}
         </section>

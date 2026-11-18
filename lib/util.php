@@ -138,14 +138,56 @@ function date_segment(array $customer): string
     return date('Y-m-d');
 }
 
-function storage_ok(array $cfg): bool
+/** ['ok' => bool, 'error' => ?string] – used by the app to show what is wrong with the data folder. */
+function storage_status(array $cfg): array
 {
     try {
         new Store($cfg['data_dir']);
-        return true;
+        return ['ok' => true, 'error' => null];
     } catch (Throwable $e) {
-        return false;
+        return ['ok' => false, 'error' => $e->getMessage()];
     }
+}
+
+function php_user(): string
+{
+    if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+        $u = @posix_getpwuid(posix_geteuid());
+        if (!empty($u['name'])) return $u['name'];
+    }
+    return get_current_user() ?: '?';
+}
+
+/** Path as seen in the FTP client (Plesk: relative to /var/www/vhosts/<domain>). */
+function ftp_path(string $abs): string
+{
+    return preg_match('#/vhosts/[^/]+(/.*)$#', $abs, $m) ? $m[1] : $abs;
+}
+
+/** Human-readable reason why PHP cannot use $dir. */
+function dir_problem(string $dir): string
+{
+    $show = ftp_path($dir) !== $dir ? '"' . ftp_path($dir) . '" (Server-Pfad ' . $dir . ')' : '"' . $dir . '"';
+    $ob = (string)ini_get('open_basedir');
+    if ($ob !== '') {
+        $inside = false;
+        foreach (explode(PATH_SEPARATOR, $ob) as $allowed) {
+            $allowed = rtrim(trim($allowed), '/');
+            if ($allowed !== '' && ($dir === $allowed || str_starts_with($dir, $allowed . '/'))) $inside = true;
+        }
+        if (!$inside) {
+            return "Datenordner $show liegt außerhalb des für PHP erlaubten Bereichs (open_basedir: $ob). "
+                . 'In config.php bei data_dir einen Ordner innerhalb davon eintragen.';
+        }
+    }
+    $p = $dir;
+    while (!@is_dir($p) && dirname($p) !== $p) $p = dirname($p);
+    if (!@is_dir($dir)) {
+        return "Datenordner $show existiert nicht und PHP (Benutzer " . php_user() . ') darf ihn in "'
+            . ftp_path($p) . '" nicht anlegen. Bitte den Ordner per FTP anlegen.';
+    }
+    return "Datenordner $show ist für PHP (Benutzer " . php_user() . ') nicht beschreibbar. '
+        . 'Bitte per FTP die Rechte des Ordners auf 775 setzen.';
 }
 
 function send_file(string $file, string $mime, string $name): void
@@ -171,10 +213,9 @@ final class Store
 
     public function __construct(string $dir)
     {
-        if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
-            throw new HttpError(500, "Datenordner kann nicht angelegt werden: $dir – bitte data_dir in config.php prüfen.");
+        if ((!@is_dir($dir) && !@mkdir($dir, 0775, true)) || !@is_writable($dir)) {
+            throw new HttpError(500, dir_problem($dir));
         }
-        if (!is_writable($dir)) throw new HttpError(500, "Datenordner ist nicht beschreibbar: $dir");
         $this->dir = rtrim(realpath($dir) ?: $dir, '/');
         $this->tmp = $this->dir . '/.tmp';
         if (!is_dir($this->tmp)) @mkdir($this->tmp, 0775, true);
@@ -328,7 +369,14 @@ final class Store
             $stepDir = (array_search($step, STEP_IDS, true) + 1) . '_' . $step;
             if (!is_dir($this->path($c['rel'], $stepDir))) @mkdir($this->path($c['rel'], $stepDir), 0775, true);
 
-            $label = safe_segment($body['label'] ?? '', 'datei');
+            // File name: <Kunde>_<Datum>_<Uhrzeit>_<Bezeichnung>_<ID>, readable when copied out of the folder.
+            $customer = (array)($c['data']['customer'] ?? []);
+            $meta0 = is_array($body['meta'] ?? null) ? $body['meta'] : [];
+            $when = date_segment($customer);
+            if (!empty($meta0['takenAt']) && ($t = strtotime((string)$meta0['takenAt'])) !== false) {
+                $when = (new DateTime('@' . $t))->setTimezone(new DateTimeZone('Europe/Berlin'))->format('Y-m-d_H-i');
+            }
+            $label = safe_segment($customer['name'] ?? '', 'Kunde') . "_{$when}_" . safe_segment($body['label'] ?? '', 'datei');
             $short = substr($fileId, 0, 8);
             $name = "{$label}_{$short}" . self::ext((string)($body['name'] ?? ''), (string)($body['mime'] ?? ''));
             if (!rename($tmpMain, $this->path($c['rel'], $stepDir, $name))) throw new HttpError(500, 'Datei konnte nicht abgelegt werden');
