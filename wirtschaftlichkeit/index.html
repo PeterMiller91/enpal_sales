@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F766E">
+<meta name="robots" content="noindex">
+<title>Wirtschaftlichkeit Wärmepumpe</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<style>
+/* Design der Baubarkeits-Check-App */
+:root {
+  --bg: #F4F6F5; --surface: #fff; --text: #14201D; --muted: #52605C; --line: #D5DDDA;
+  --accent: #0F766E; --accent-dark: #0B5A54; --accent-soft: #E6F2F0; --accent-ink: #0B4F4A;
+  --old: #C2410C; --old-soft: #FDEBDD; --old-ink: #8A3A06;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+button { font: inherit; cursor: pointer; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+header.bar { background: #fff; border-bottom: 1px solid var(--line); }
+header.bar .wrap { display: flex; justify-content: space-between; align-items: center; min-height: 60px; gap: 12px; padding-top: env(safe-area-inset-top); }
+.kicker { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.links { display: flex; gap: 14px; font-size: 13px; font-weight: 600; }
+.links a { color: var(--accent); text-decoration: none; }
+.intro { padding: 20px 0 4px; }
+h1 { margin: 0 0 6px; font-size: clamp(22px, 4vw, 30px); line-height: 1.15; }
+.lead { margin: 0; color: var(--muted); max-width: 75ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 430px) minmax(0, 1fr); gap: 16px; padding: 14px 0 40px; align-items: start; }
+@media (max-width: 920px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.results { position: sticky; top: 12px; }
+@media (max-width: 920px) { .results { position: static; } }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card + .card { margin-top: 12px; }
+h2 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+h2 .num { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+h3 { margin: 0; font-size: 15px; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seg.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg button { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; font-weight: 600; color: var(--muted); padding: 0 6px; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.f > label, .lbl { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.in { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; background: #fff; }
+.in:focus-within { outline: 2px solid var(--accent); border-color: var(--accent); }
+.in input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 16px; padding: 0 12px; background: none; color: var(--text); font-variant-numeric: tabular-nums; }
+.in .u { padding: 0 12px 0 4px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.in.changed { border-color: var(--accent); background: #FAFDFC; }
+.help { font-size: 12px; color: var(--muted); }
+.help button.link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; font-size: 12px; }
+.row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.i { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--accent); background: #fff; color: var(--accent); font-size: 11px; font-weight: 700; font-style: normal; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: help; }
+.i:hover, .i:focus-visible, .i[aria-expanded="true"] { background: var(--accent); color: #fff; outline: none; }
+#tip { position: fixed; z-index: 50; max-width: 320px; background: #14201D; color: #fff; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: 0 8px 24px rgba(0,0,0,.2); pointer-events: none; }
+#tip b { color: #7DD3C8; display: block; margin-bottom: 2px; }
+.range { display: flex; align-items: center; gap: 12px; }
+.range input { flex: 1; accent-color: var(--accent); height: 28px; }
+.range output { font-weight: 700; font-size: 18px; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); gap: 6px; }
+.chk { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.chk input { width: 20px; height: 20px; accent-color: var(--accent); margin: 2px 0 0; flex-shrink: 0; }
+.chk .note { display: block; font-size: 12px; color: var(--muted); }
+.sum { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+.sum b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.sum.green { background: var(--accent-soft); color: var(--accent-ink); }
+.sum.plain { border: 1px solid var(--line); }
+details.adv { border-top: 1px solid var(--line); padding-top: 10px; }
+details.adv summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
+details.adv[open] summary { margin-bottom: 10px; }
+.adv-body { display: flex; flex-direction: column; gap: 10px; }
+.estimate { background: var(--bg); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.btn { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: 14px; font-weight: 600; color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-dark); }
+.btn.small { min-height: 36px; font-size: 13px; padding: 0 12px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.kpi .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.kpi .t { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+.kpi.hero { background: var(--accent); border-color: var(--accent); color: #fff; }
+.kpi.hero .t { color: #D1EDE9; }
+.kpi.bad { background: var(--old-soft); border-color: #F2C8AC; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--c); }
+.chartbox { position: relative; }
+.chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.chart .grid { stroke: #E6EBE9; }
+.chart .ax { font-size: 11px; fill: #52605C; }
+.chart .l-old { fill: none; stroke: var(--old); stroke-width: 3; stroke-linejoin: round; }
+.chart .l-new { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linejoin: round; }
+.chart .gain { fill: var(--accent); opacity: .14; }
+.chart .be { stroke: #14201D; stroke-dasharray: 4 4; }
+.chart .be-dot { fill: #fff; stroke: #14201D; stroke-width: 2; }
+.chart .be-box { fill: #14201D; }
+.chart .be-t1 { fill: #7DD3C8; font-size: 11px; font-weight: 700; }
+.chart .be-t2 { fill: #fff; font-size: 13px; font-weight: 700; }
+.chart .hl { stroke: #9AA8A4; }
+.chart .d-old { fill: var(--old); } .chart .d-new { fill: var(--accent); }
+.ctip { position: absolute; top: 30%; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; box-shadow: 0 6px 18px rgba(0,0,0,.1); min-width: 190px; pointer-events: none; }
+.ctip div { display: flex; justify-content: space-between; gap: 12px; }
+.ctip .h { font-weight: 700; margin-bottom: 4px; }
+.ctip .tot { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.brow { display: grid; grid-template-columns: 120px 1fr 84px; gap: 10px; align-items: center; font-size: 13px; }
+@media (max-width: 480px) { .brow { grid-template-columns: 90px 1fr 70px; } }
+.btrack { display: flex; height: 26px; border-radius: 6px; overflow: hidden; }
+.btrack span { height: 100%; }
+.brow .val { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.blegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.blegend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.story { background: var(--accent-soft); border-radius: 12px; padding: 14px 16px; color: var(--accent-ink); }
+.story.warn { background: var(--old-soft); color: var(--old-ink); }
+.story h3 { margin: 0 0 6px; }
+.story p { margin: 0; font-size: 14px; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------------- Ausdruck für den Kunden ---------------- */
+.print { display: none; }
+@page { size: A4; margin: 12mm 14mm 10mm; }
+@media print {
+  html, body { background: #fff; }
+  body { font-size: 11pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .screen, #tip { display: none !important; }
+  .print { display: block; color: #14201D; }
+}
+.p-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2pt solid #0F766E; padding-bottom: 8pt; }
+.p-head .k { font-size: 9pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #0F766E; }
+.p-head .who { font-size: 10pt; color: #52605C; text-align: right; }
+.p-title { font-size: 21pt; font-weight: 700; line-height: 1.15; margin: 10pt 0 2pt; }
+.p-sub { font-size: 11pt; color: #52605C; margin: 0 0 12pt; }
+.p-hero { background: #0F766E; color: #fff; border-radius: 10pt; padding: 12pt 16pt; display: flex; align-items: center; justify-content: space-between; gap: 12pt; }
+.p-hero .big { font-size: 28pt; font-weight: 800; line-height: 1; }
+.p-hero .txt { font-size: 12pt; }
+.p-hero .txt b { display: block; font-size: 14pt; }
+.p-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; margin: 14pt 0 10pt; }
+.p-col { border-radius: 10pt; padding: 12pt 14pt; border: 1pt solid #D5DDDA; position: relative; }
+.p-col.old { background: #FAFAFA; color: #52605C; }
+.p-col.new { border: 2.5pt solid #0F766E; background: #E6F2F0; color: #0B4F4A; }
+.p-col .tag { font-size: 9pt; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.p-col .name { font-size: 14pt; font-weight: 700; margin: 2pt 0 8pt; color: #14201D; }
+.p-col .amount { font-size: 24pt; font-weight: 800; line-height: 1; }
+.p-col .per { font-size: 10pt; }
+.p-col .badge { position: absolute; top: -9pt; right: 12pt; background: #0F766E; color: #fff; font-size: 9pt; font-weight: 700; padding: 3pt 9pt; border-radius: 99pt; }
+.p-col ul { margin: 8pt 0 0; padding-left: 14pt; font-size: 10pt; }
+.p-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; margin-bottom: 8pt; }
+.p-fact { border: 1pt solid #D5DDDA; border-radius: 8pt; padding: 8pt 10pt; }
+.p-fact b { display: block; font-size: 15pt; }
+.p-fact span { font-size: 9.5pt; color: #52605C; }
+.p-fact.green { background: #E6F2F0; border-color: #0F766E; }
+.p-chart h3 { font-size: 12pt; margin: 0 0 2pt; }
+.p-chart .chart .ax { font-size: 12px; }
+.p-why { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; margin-top: 10pt; }
+.p-why div { font-size: 10pt; border-left: 3pt solid #0F766E; padding: 2pt 0 2pt 8pt; }
+.p-why b { display: block; font-size: 10.5pt; }
+.p-foot { margin-top: 10pt; font-size: 8pt; color: #52605C; border-top: 1pt solid #D5DDDA; padding-top: 6pt; }
+</style>
+</head>
+<body>
+<div class="screen">
+<header class="bar"><div class="wrap">
+  <span class="kicker">Wirtschaftlichkeit Wärmepumpe</span>
+  <nav class="links" aria-label="Weitere Seiten"><a href="../">Baubarkeits-Check</a><a href="../faq/">FAQ</a></nav>
+</div></header>
+
+<div class="wrap">
+  <section class="intro">
+    <h1>Lohnt sich die Wärmepumpe?</h1>
+    <p class="lead">Die Felder sind mit Standardwerten vorbelegt. Überschreiben Sie sie mit den Zahlen des Kunden (geänderte Felder werden grün umrandet). Bei jedem <i class="i" aria-hidden="true" style="display:inline-flex">i</i> gibt es eine Erklärung. „Für den Kunden drucken“ erzeugt eine einfache Übersicht ohne Fachbegriffe.</p>
+  </section>
+
+  <div class="layout">
+    <form id="form" autocomplete="off" onsubmit="return false">
+      <section class="card">
+        <h2><span class="num">1</span>Kunde &amp; heutige Heizung</h2>
+        <div class="row2">
+          <div class="f"><label for="customer">Kunde (für den Ausdruck)</label><div class="in"><input id="customer" data-k="customer" placeholder="z. B. Familie Müller"></div></div>
+          <div class="f"><label for="area">Wohnfläche <button type="button" class="i" data-tip="area">i</button></label><div class="in"><input id="area" data-k="area" inputmode="decimal"><span class="u">m²</span></div></div>
+        </div>
+        <div class="f"><span class="lbl">Energieträger heute <button type="button" class="i" data-tip="carrier">i</button></span>
+          <div class="seg" id="carrier" role="group" aria-label="Energieträger"></div></div>
+        <div class="f"><label for="consumption">Jahresverbrauch <button type="button" class="i" data-tip="consumption">i</button></label>
+          <div class="in"><input id="consumption" data-k="consumption" inputmode="decimal"><span class="u" data-unit="consumption"></span></div>
+          <div class="help"><span id="consumptionHint"></span> <button type="button" class="link" id="estToggle">Unbekannt? Schätzen</button></div>
+          <div class="estimate" id="estimate" hidden>
+            <div class="f"><span class="lbl">Baujahr des Hauses <button type="button" class="i" data-tip="built">i</button></span>
+              <div class="seg four" id="built" role="group" aria-label="Baujahr"></div></div>
+            <div class="help" id="estResult"></div>
+            <button type="button" class="btn small primary" id="estApply">Schätzwert übernehmen</button>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="f"><label for="price">Preis <button type="button" class="i" data-tip="price">i</button></label><div class="in"><input id="price" data-k="price" inputmode="decimal"><span class="u" data-unit="price"></span></div></div>
+          <div class="f"><label for="base">Grundpreis / Tankmiete <button type="button" class="i" data-tip="base">i</button></label><div class="in"><input id="base" data-k="base" inputmode="decimal"><span class="u">€/Jahr</span></div></div>
+        </div>
+        <div class="row2">
+          <div class="f"><label for="maint">Wartung &amp; Schornsteinfeger <button type="button" class="i" data-tip="maint">i</button></label><div class="in"><input id="maint" data-k="maint" inputmode="decimal"><span class="u">€/Jahr</span></div></div>
+          <div class="f"><label for="age">Alter der Heizung <button type="button" class="i" data-tip="age">i</button></label><div class="in"><input id="age" data-k="age" inputmode="numeric"><span class="u">Jahre</span></div></div>
+        </div>
+        <details class="adv"><summary>Weitere Annahmen: Wirkungsgrad &amp; Preissteigerung</summary>
+          <div class="adv-body">
+            <div class="row2">
+              <div class="f"><label for="eff">Wirkungsgrad alte Heizung <button type="button" class="i" data-tip="eff">i</button></label><div class="in"><input id="eff" data-k="eff" inputmode="decimal"><span class="u">%</span></div></div>
+              <div class="f"><label for="escOld">Preissteigerung heute <button type="button" class="i" data-tip="escOld">i</button></label><div class="in"><input id="escOld" data-k="escOld" inputmode="decimal"><span class="u">% / Jahr</span></div></div>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">2</span>Die neue Wärmepumpe</h2>
+        <div class="f"><label for="jaz">Jahresarbeitszahl (JAZ) <button type="button" class="i" data-tip="jaz">i</button></label>
+          <div class="range"><input type="range" id="jaz" data-k="jaz" min="2.5" max="4.5" step="0.1"><output id="jazOut"></output></div>
+          <div class="scale"><span>2,5 schwach</span><span>3,5 typisch Altbau</span><span>4,5 Fußbodenheizung</span></div></div>
+        <div class="row2">
+          <div class="f"><label for="elPrice">Strompreis Wärmepumpe <button type="button" class="i" data-tip="elPrice">i</button></label><div class="in"><input id="elPrice" data-k="elPrice" inputmode="decimal"><span class="u">ct/kWh</span></div></div>
+          <div class="f"><label for="elBase">Zähler-Grundpreis <button type="button" class="i" data-tip="elBase">i</button></label><div class="in"><input id="elBase" data-k="elBase" inputmode="decimal"><span class="u">€/Jahr</span></div></div>
+        </div>
+        <div class="row2">
+          <div class="f"><label for="hpMaint">Wartung <button type="button" class="i" data-tip="hpMaint">i</button></label><div class="in"><input id="hpMaint" data-k="hpMaint" inputmode="decimal"><span class="u">€/Jahr</span></div></div>
+          <div class="f"><label for="pv">Anteil eigener Solarstrom <button type="button" class="i" data-tip="pv">i</button></label><div class="in"><input id="pv" data-k="pv" inputmode="decimal"><span class="u">%</span></div></div>
+        </div>
+        <details class="adv"><summary>Weitere Annahmen: Strompreis-Entwicklung</summary>
+          <div class="adv-body"><div class="row2">
+            <div class="f"><label for="escEl">Preissteigerung Strom <button type="button" class="i" data-tip="escEl">i</button></label><div class="in"><input id="escEl" data-k="escEl" inputmode="decimal"><span class="u">% / Jahr</span></div></div>
+            <div class="f"><label for="pvValue">Wert Solarstrom <button type="button" class="i" data-tip="pvValue">i</button></label><div class="in"><input id="pvValue" data-k="pvValue" inputmode="decimal"><span class="u">ct/kWh</span></div></div>
+          </div></div>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">3</span>Investition &amp; Förderung</h2>
+        <div class="f"><label for="invest">Gesamtkosten Wärmepumpe inkl. Einbau <button type="button" class="i" data-tip="invest">i</button></label><div class="in"><input id="invest" data-k="invest" inputmode="decimal"><span class="u">€</span></div>
+          <div class="help">Aus dem Angebot. Typisch Einfamilienhaus: 25.000–40.000 €.</div></div>
+        <label class="chk"><input type="checkbox" checked disabled> <span><b>Grundförderung 30 %</b><span class="note">für alle selbstnutzenden Eigentümer</span></span></label>
+        <label class="chk"><input type="checkbox" id="klima" data-k="klima"> <span><b>Klimabonus 16 %</b> <button type="button" class="i" data-tip="klima">i</button><span class="note" id="klimaNote"></span></span></label>
+        <div class="f"><span class="lbl">Einkommensbonus <button type="button" class="i" data-tip="income">i</button></span>
+          <div class="seg four" id="income" role="group" aria-label="Einkommensbonus"></div></div>
+        <div class="sum green"><span id="subsidyLabel"></span><b id="subsidyOut"></b></div>
+        <div class="sum plain"><span>Eigenanteil</span><b id="ownOut"></b></div>
+        <div class="f"><span class="lbl">Womit vergleichen? <button type="button" class="i" data-tip="mode">i</button></span>
+          <div class="seg two" id="mode" role="group" aria-label="Vergleich"></div></div>
+        <div class="f" id="sowiesoBox"><label for="sowieso">Kosten neue fossile Heizung <button type="button" class="i" data-tip="sowieso">i</button></label><div class="in"><input id="sowieso" data-k="sowieso" inputmode="decimal"><span class="u">€</span></div></div>
+        <details class="adv"><summary>Weitere Annahmen: Förderdeckel &amp; Zeitraum</summary>
+          <div class="adv-body"><div class="row2">
+            <div class="f"><label for="cap">Max. förderfähige Kosten <button type="button" class="i" data-tip="cap">i</button></label><div class="in"><input id="cap" data-k="cap" inputmode="decimal"><span class="u">€</span></div></div>
+            <div class="f"><label for="years">Betrachtungszeitraum <button type="button" class="i" data-tip="years">i</button></label><div class="in"><input id="years" data-k="years" inputmode="numeric"><span class="u">Jahre</span></div></div>
+          </div></div>
+        </details>
+        <div class="actions"><button type="button" class="btn small" id="reset">Alle Werte auf Standard zurücksetzen</button></div>
+      </section>
+    </form>
+
+    <div class="results">
+      <section class="card" aria-live="polite">
+        <h2><span class="num">4</span>Ergebnis</h2>
+        <div class="kpis" id="kpis"></div>
+        <div>
+          <h3 style="margin-bottom:6px">Gesamtkosten über <span data-years></span> Jahre</h3>
+          <div class="legend"><span style="--c:var(--old)" id="legOld"></span><span style="--c:var(--accent)">Wärmepumpe (inkl. Eigenanteil)</span></div>
+          <div class="chartbox" id="chartbox"></div>
+          <p class="note">Tippen oder mit der Maus über das Diagramm fahren, um die Werte je Jahr zu sehen.</p>
+        </div>
+        <div>
+          <h3 style="margin-bottom:8px">Kosten im ersten Jahr</h3>
+          <div class="bars" id="bars"></div>
+          <div class="blegend"><span><i style="background:#64748B"></i>Energie</span><span><i style="background:#94A3B8"></i>Grundpreis</span><span><i style="background:#CBD5E1"></i>Wartung &amp; Schornsteinfeger</span></div>
+        </div>
+        <div class="story" id="story"></div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="printBtn">Für den Kunden drucken / als PDF</button>
+        </div>
+        <p class="note" id="assumptions"></p>
+      </section>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="print" id="print"></div>
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- Standardwerte (Stand Nov. 2026, frei überschreibbar)
+  const CARRIERS = {
+    gas:      { label: 'Erdgas',       name: 'Gasheizung',          unit: 'kWh',   kwh: 1,   price: 11,   priceUnit: 'ct/kWh',   factor: 0.01, base: 180, maint: 250, eff: 85,  esc: 3,   co2: 0.201, fossil: true,
+                hint: 'Steht auf der Gas-Jahresabrechnung als „Verbrauch in kWh“. Nur m³ angegeben? Mal 10 rechnen.' },
+    oil:      { label: 'Heizöl',       name: 'Ölheizung',           unit: 'Liter', kwh: 10,  price: 1.0,  priceUnit: '€/Liter',  factor: 1,    base: 0,   maint: 300, eff: 85,  esc: 3,   co2: 0.266, fossil: true,
+                hint: 'Getankte Liter pro Jahr, am besten Durchschnitt der letzten 3 Jahre (Lieferscheine).' },
+    lpg:      { label: 'Flüssiggas',   name: 'Flüssiggasheizung',   unit: 'Liter', kwh: 6.6, price: 0.7,  priceUnit: '€/Liter',  factor: 1,    base: 120, maint: 250, eff: 85,  esc: 3,   co2: 0.239, fossil: true,
+                hint: 'Getankte Liter pro Jahr (Rechnungen des Gaslieferanten). Grundpreis = Tankmiete.' },
+    pellets:  { label: 'Pellets',      name: 'Pelletheizung',       unit: 'kg',    kwh: 4.8, price: 0.32, priceUnit: '€/kg',     factor: 1,    base: 0,   maint: 350, eff: 80,  esc: 2,   co2: 0.036, fossil: false,
+                hint: 'Gelieferte Menge pro Jahr in kg (1 Tonne = 1.000 kg).' },
+    night:    { label: 'Nachtspeicher', name: 'Nachtspeicherheizung', unit: 'kWh', kwh: 1,   price: 30,   priceUnit: 'ct/kWh',   factor: 0.01, base: 120, maint: 0,   eff: 100, esc: 2,   co2: 0.36,  fossil: false,
+                hint: 'Heizstrom-Verbrauch laut Stromabrechnung (eigener Zähler bzw. Niedertarif „NT“).' },
+    district: { label: 'Fernwärme',    name: 'Fernwärme',           unit: 'kWh',   kwh: 1,   price: 14,   priceUnit: 'ct/kWh',   factor: 0.01, base: 400, maint: 0,   eff: 100, esc: 2.5, co2: 0.28,  fossil: false,
+                hint: 'Wärmemenge laut Jahresabrechnung des Versorgers in kWh (bei MWh mal 1.000).' },
+  };
+  const DEFAULTS = {
+    customer: '', area: 140, carrier: 'gas', consumption: 20000, age: 22,
+    jaz: 3.5, elPrice: 27, elBase: 100, hpMaint: 150, pv: 0, escEl: 2, pvValue: 8,
+    invest: 32000, klima: null, income: 0, mode: 'keep', sowieso: 12000, cap: 28000, years: 20, built: 'b1978',
+  };
+  const BUILT = { b1978: ['bis 1978', 180], b1994: ['1979–1994', 140], b2009: ['1995–2009', 100], b2010: ['ab 2010', 60] };
+  const CO2_EL = 0.36; // kg CO₂ je kWh Strommix
+
+  const TIPS = {
+    area: ['Wohnfläche', 'Beheizte Wohnfläche in m². Wird nur für die Verbrauchsschätzung gebraucht, wenn der Kunde seinen Verbrauch nicht kennt.'],
+    carrier: ['Energieträger heute', 'Womit heizt der Kunde heute? Einheit, Preis und Standardwerte passen sich automatisch an.'],
+    consumption: ['Jahresverbrauch', 'Die wichtigste Zahl. Am besten von der letzten Jahresabrechnung, bei Öl oder Pellets der Durchschnitt mehrerer Jahre. Wenn unbekannt: über „Schätzen“ aus Wohnfläche und Baujahr.'],
+    built: ['Baujahr', 'Ältere, wenig gedämmte Häuser brauchen mehr Wärme pro m². Grobe Richtwerte: bis 1978 ca. 180, 1979–1994 ca. 140, 1995–2009 ca. 100, ab 2010 ca. 60 kWh pro m² und Jahr.'],
+    price: ['Preis', 'Aktueller Preis pro Einheit laut Rechnung oder Vertrag, ohne Grundpreis. Bei Gas: „Arbeitspreis“ in ct/kWh brutto.'],
+    base: ['Grundpreis / Tankmiete', 'Feste Kosten pro Jahr, unabhängig vom Verbrauch: Grundpreis bei Gas, Strom und Fernwärme, Tankmiete bei Flüssiggas. Entfallen mit der Wärmepumpe.'],
+    maint: ['Wartung & Schornsteinfeger', 'Jährliche Wartung, Schornsteinfeger bzw. Abgasmessung, bei Öl auch Tankversicherung. Fällt mit der Wärmepumpe größtenteils weg.'],
+    age: ['Alter der Heizung', 'Wichtig für den Klimabonus: Gas-, Flüssiggas- und Pelletheizungen ab 20 Jahren, Öl- und Nachtspeicherheizungen immer.'],
+    eff: ['Wirkungsgrad', 'Wie viel der eingekauften Energie im Haus als Wärme ankommt. Ältere Kessel ca. 80–85 %, Brennwertkessel ca. 90–95 %, Strom und Fernwärme 100 %. Daraus ergibt sich der tatsächliche Wärmebedarf.'],
+    escOld: ['Preissteigerung', 'Angenommene Preissteigerung pro Jahr. Bei Gas und Öl kommt der steigende CO₂-Preis dazu, daher sind 3 % eher vorsichtig.'],
+    jaz: ['Jahresarbeitszahl (JAZ)', 'So viele kWh Wärme macht die Wärmepumpe im Jahresschnitt aus 1 kWh Strom. Altbau mit Heizkörpern meist 3,0–3,8, mit Fußbodenheizung bis 4,5. Die Förderung verlangt mindestens 3,0.'],
+    elPrice: ['Strompreis Wärmepumpe', 'Arbeitspreis des Wärmepumpentarifs bzw. des normalen Haushaltstroms in ct/kWh brutto. Wärmepumpentarife liegen meist einige Cent unter dem Haushaltsstrom.'],
+    elBase: ['Zähler-Grundpreis', 'Grundpreis für einen eigenen Wärmepumpenzähler. Läuft die Wärmepumpe über den Haushaltszähler, hier 0 eintragen.'],
+    hpMaint: ['Wartung Wärmepumpe', 'Empfohlen ist eine Wartung pro Jahr, meist ein niedriger dreistelliger Betrag. Kein Schornsteinfeger mehr nötig.'],
+    pv: ['Anteil Solarstrom', 'Wie viel Prozent des Wärmepumpen-Stroms aus der eigenen PV-Anlage kommen. Ohne PV: 0. Mit PV realistisch 15–30 %, im Winter weniger.'],
+    escEl: ['Preissteigerung Strom', 'Angenommene Strompreissteigerung pro Jahr. Strom ist weniger vom CO₂-Preis betroffen als Gas und Öl.'],
+    pvValue: ['Wert Solarstrom', 'Was eine selbst verbrauchte Solar-kWh „kostet“: die entgangene Einspeisevergütung, meist ca. 8 ct.'],
+    invest: ['Gesamtkosten', 'Gesamtpreis laut Angebot inkl. Gerät, Speicher, Montage, Elektrik, hydraulischem Abgleich und Ausbau der Altanlage, vor Förderung.'],
+    klima: ['Klimabonus 16 %', 'Für Selbstnutzer, die eine Öl-, Kohle-, Gasetagen- oder Nachtspeicherheizung ersetzen, oder eine Gas- bzw. Biomasseheizung ab 20 Jahren. Antrag bis 31.01.2027, danach sinkt der Bonus schrittweise.'],
+    income: ['Einkommensbonus', 'Zu versteuerndes Haushaltseinkommen (Steuerbescheide 2023 und 2024): bis 30.000 € = 40 %, bis 40.000 € = 30 %, bis 50.000 € = 10 %. Pro minderjährigem Kind 10.000 € abziehen.'],
+    mode: ['Vergleich', '„Alte weiterbetreiben“: die heutige Heizung läuft weiter, ohne Anschaffung. „Neue fossile kaufen“: der Kunde müsste sowieso eine neue Gas- oder Ölheizung kaufen. Dann zählt nur der Mehrpreis der Wärmepumpe.'],
+    sowieso: ['Kosten neue fossile Heizung', 'Was eine neue Gas- oder Ölheizung inkl. Einbau kosten würde (ohne Förderung), meist ca. 10.000–15.000 €.'],
+    cap: ['Förderfähige Kosten', 'Höchstbetrag, auf den die Förderung berechnet wird. KfW 458: 28.000 € für die erste Wohneinheit (Stand 18.11.2026).'],
+    years: ['Zeitraum', 'Über wie viele Jahre verglichen wird. 20 Jahre entsprechen etwa der Lebensdauer einer Wärmepumpe.'],
+  };
+
+  // ---------------------------------------------------------------- helpers
+  const $ = (id) => document.getElementById(id);
+  const nf0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const nfn = (v, d) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: d }).format(v);
+  const eur = (v) => nf0.format(Math.round(v)) + ' €';
+  const eurR = (v, step = 10) => nf0.format(Math.round(v / step) * step) + ' €'; // gerundet für Kunden
+  const num = (s) => {
+    const t = String(s ?? '').trim().replace(/\s/g, '');
+    if (!t) return NaN;
+    // "20.000" (de) → 20000, "11,5" → 11.5
+    const n = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : /^\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, '') : t);
+    return Number.isFinite(n) ? n : NaN;
+  };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+  // ---------------------------------------------------------------- state
+  const KEY = 'bbc-wirtschaftlichkeit-v1';
+  let s = loadState();
+  function carrierDefaults(c) {
+    const d = CARRIERS[c];
+    return { price: d.price, base: d.base, maint: d.maint, eff: d.eff, escOld: d.esc };
+  }
+  function fresh() { return { ...DEFAULTS, ...carrierDefaults(DEFAULTS.carrier) }; }
+  function loadState() {
+    try {
+      const v = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (v && CARRIERS[v.carrier]) return { ...fresh(), ...v };
+    } catch (_) { /* privat/gesperrt */ }
+    return fresh();
+  }
+  function saveState() { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (_) { /* ignore */ } }
+  const defaultFor = (k) => (k in carrierDefaults(s.carrier) ? carrierDefaults(s.carrier)[k] : DEFAULTS[k]);
+
+  // ---------------------------------------------------------------- form binding
+  const fmtInput = (k, v) => {
+    if (k === 'customer') return v;
+    if (!Number.isFinite(v)) return '';
+    if (k === 'price' && CARRIERS[s.carrier].factor === 1) return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 }).format(v);
+    return nfn(v, 2);
+  };
+  function fillForm() {
+    document.querySelectorAll('input[data-k]').forEach((el) => {
+      const k = el.dataset.k;
+      if (el.type === 'checkbox') return;
+      if (el.type === 'range') { el.value = s[k]; return; }
+      if (document.activeElement !== el) el.value = fmtInput(k, s[k]);
+      markChanged(el);
+    });
+    document.querySelectorAll('[data-unit="consumption"]').forEach((e) => (e.textContent = CARRIERS[s.carrier].unit + ' / Jahr'));
+    document.querySelectorAll('[data-unit="price"]').forEach((e) => (e.textContent = CARRIERS[s.carrier].priceUnit));
+    $('consumptionHint').textContent = CARRIERS[s.carrier].hint;
+    $('jazOut').textContent = nf1.format(s.jaz);
+    seg('carrier', Object.entries(CARRIERS).map(([k, c]) => [k, c.label]), s.carrier);
+    seg('income', [[0, 'keiner'], [10, '10 %'], [30, '30 %'], [40, '40 %']], s.income);
+    seg('mode', [['keep', 'Alte weiterbetreiben'], ['new', 'Neue fossile kaufen']], s.mode);
+    seg('built', Object.entries(BUILT).map(([k, b]) => [k, b[0]]), s.built);
+    $('sowiesoBox').hidden = s.mode !== 'new';
+    $('klima').checked = klimaActive();
+    $('klimaNote').textContent = klimaReason();
+  }
+  function markChanged(el) {
+    const k = el.dataset.k;
+    if (k === 'customer') return;
+    const d = defaultFor(k);
+    el.closest('.in')?.classList.toggle('changed', Number.isFinite(s[k]) && Math.abs(s[k] - d) > 1e-9);
+  }
+  function seg(id, options, current) {
+    const box = $(id);
+    const html = options.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${String(v) === String(current)}">${esc(l)}</button>`).join('');
+    if (box.innerHTML !== html) box.innerHTML = html;
+  }
+
+  $('form').addEventListener('input', (e) => {
+    const k = e.target.dataset.k;
+    if (!k) return;
+    if (e.target.type === 'checkbox') s[k] = e.target.checked;
+    else if (k === 'customer') s[k] = e.target.value;
+    else s[k] = e.target.type === 'range' ? Number(e.target.value) : num(e.target.value);
+    if (k === 'jaz') $('jazOut').textContent = nf1.format(s.jaz);
+    if (k === 'age' || k === 'carrier') { $('klima').checked = klimaActive(); $('klimaNote').textContent = klimaReason(); }
+    markChanged(e.target);
+    saveState();
+    update();
+  });
+  // Nach Verlassen eines Feldes schön formatieren (z. B. 20000 → 20.000)
+  $('form').addEventListener('focusout', (e) => {
+    const k = e.target.dataset && e.target.dataset.k;
+    if (k && e.target.type === 'text' && k !== 'customer' && Number.isFinite(s[k])) e.target.value = fmtInput(k, s[k]);
+  });
+  $('form').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg button');
+    if (!b) return;
+    const id = b.parentElement.id;
+    const v = b.dataset.v;
+    if (id === 'carrier' && v !== s.carrier) {
+      const old = CARRIERS[s.carrier];
+      // Verbrauch in Wärme umrechnen, damit der Wert beim Wechsel sinnvoll bleibt
+      const heat = s.consumption * old.kwh * (s.eff / 100);
+      s.carrier = v;
+      Object.assign(s, carrierDefaults(v));
+      const c = CARRIERS[v];
+      s.consumption = Math.round(heat / (s.eff / 100) / c.kwh / 10) * 10;
+      s.klima = null;
+    } else if (id === 'income') s.income = Number(v);
+    else if (id === 'mode') s.mode = v;
+    else if (id === 'built') { s.built = v; estimate(); }
+    fillForm();
+    saveState();
+    update();
+  });
+  $('klima').addEventListener('change', (e) => { s.klima = e.target.checked; $('klimaNote').textContent = klimaReason(); saveState(); update(); });
+
+  // Schätzung aus Wohnfläche × Baujahr
+  function estimate() {
+    const per = BUILT[s.built][1];
+    const heatNeed = (Number.isFinite(s.area) ? s.area : 0) * per;
+    const c = CARRIERS[s.carrier];
+    const val = Math.round(heatNeed / (s.eff / 100) / c.kwh / 10) * 10;
+    $('estResult').innerHTML = s.area > 0
+      ? `${nf0.format(s.area)} m² × ca. ${per} kWh/m² ≈ <b>${nf0.format(val)} ${c.unit}</b> pro Jahr`
+      : 'Bitte oben die Wohnfläche eintragen.';
+    return val;
+  }
+  $('estToggle').addEventListener('click', () => { $('estimate').hidden = !$('estimate').hidden; estimate(); });
+  $('estApply').addEventListener('click', () => {
+    const v = estimate();
+    if (v > 0) { s.consumption = v; $('consumption').value = fmtInput('consumption', v); markChanged($('consumption')); saveState(); update(); }
+  });
+  $('area').addEventListener('input', () => { if (!$('estimate').hidden) estimate(); });
+
+  $('reset').addEventListener('click', () => {
+    if (!confirm('Alle Eingaben auf die Standardwerte zurücksetzen?')) return;
+    s = fresh();
+    saveState();
+    fillForm();
+    update();
+  });
+
+  // ---------------------------------------------------------------- Klimabonus
+  function klimaEligible() {
+    const c = s.carrier;
+    if (c === 'oil' || c === 'night') return true;
+    if (c === 'gas' || c === 'lpg' || c === 'pellets') return s.age >= 20;
+    return false;
+  }
+  const klimaActive = () => (s.klima === null || s.klima === undefined ? klimaEligible() : s.klima);
+  function klimaReason() {
+    const c = CARRIERS[s.carrier];
+    if (s.carrier === 'oil' || s.carrier === 'night') return `${c.name} wird ersetzt ✓ · Antrag bis 31.01.2027`;
+    if (s.carrier === 'district') return 'Bei Fernwärme in der Regel nicht möglich';
+    return s.age >= 20 ? `${c.name} ist ${s.age} Jahre alt (ab 20) ✓ · Antrag bis 31.01.2027` : `Erst ab 20 Jahren Heizungsalter (heute ${Number.isFinite(s.age) ? s.age : '–'})`;
+  }
+
+  // ---------------------------------------------------------------- Rechnung
+  function calc() {
+    const c = CARRIERS[s.carrier];
+    const v = (x, d = 0) => (Number.isFinite(x) ? x : d);
+    const years = Math.min(30, Math.max(5, Math.round(v(s.years, 20))));
+    const consumption = Math.max(0, v(s.consumption));
+    const eff = Math.min(110, Math.max(30, v(s.eff, c.eff))) / 100;
+    const energyKwh = consumption * c.kwh;           // eingekaufte Energie
+    const heat = energyKwh * eff;                     // Wärmebedarf
+    const fuelCost = consumption * v(s.price) * c.factor;
+    const oldFixed = v(s.base) + v(s.maint);
+
+    const jaz = Math.max(1, v(s.jaz, 3.5));
+    const hpKwh = heat / jaz;
+    const pvShare = Math.min(100, Math.max(0, v(s.pv))) / 100;
+    const elCost = hpKwh * (1 - pvShare) * v(s.elPrice) / 100 + hpKwh * pvShare * v(s.pvValue) / 100;
+    const newFixed = v(s.elBase) + v(s.hpMaint);
+
+    const invest = Math.max(0, v(s.invest));
+    const rate = Math.min(30 + (klimaActive() ? 16 : 0) + v(s.income), s.income >= 40 ? 80 : 70);
+    const subsidy = Math.min(invest, Math.max(0, v(s.cap, 28000))) * rate / 100;
+    const own = invest - subsidy;
+
+    // Vergleich mit neuer fossiler Heizung: Anschaffung zählt dort mit, Wirkungsgrad besser
+    const newFossil = s.mode === 'new';
+    const sowieso = newFossil ? Math.max(0, v(s.sowieso)) : 0;
+    const oldFuelCost = newFossil && c.fossil ? fuelCost * eff / Math.max(eff, 0.95) : fuelCost;
+
+    const escOld = v(s.escOld, c.esc) / 100;
+    const escEl = v(s.escEl, 2) / 100;
+    const inflation = 0.02; // Grundpreise & Wartung
+    const cumOld = [sowieso];
+    const cumNew = [own];
+    const yearOld = [];
+    const yearNew = [];
+    for (let y = 1; y <= years; y++) {
+      const fo = oldFuelCost * Math.pow(1 + escOld, y - 1) + oldFixed * Math.pow(1 + inflation, y - 1);
+      const fn = elCost * Math.pow(1 + escEl, y - 1) + newFixed * Math.pow(1 + inflation, y - 1);
+      yearOld.push(fo);
+      yearNew.push(fn);
+      cumOld.push(cumOld[y - 1] + fo);
+      cumNew.push(cumNew[y - 1] + fn);
+    }
+    let breakEven = null;
+    if (cumNew[0] <= cumOld[0]) breakEven = 0;
+    else {
+      for (let y = 1; y <= years; y++) {
+        if (cumOld[y] >= cumNew[y]) {
+          const d0 = cumNew[y - 1] - cumOld[y - 1];
+          const d1 = cumNew[y] - cumOld[y];
+          breakEven = y - 1 + d0 / (d0 - d1);
+          break;
+        }
+      }
+    }
+    const co2Old = energyKwh * c.co2 / 1000;
+    const co2New = hpKwh * (1 - pvShare) * CO2_EL / 1000;
+    return {
+      c, years, heat, hpKwh, fuelCost: oldFuelCost, oldFixed, elCost, newFixed, invest, rate, subsidy, own, sowieso, newFossil,
+      cumOld, cumNew, yearOld, yearNew, breakEven,
+      saving1: yearOld[0] - yearNew[0],
+      total: cumOld[years] - cumNew[years],
+      co2: co2Old - co2New, co2Old, co2New,
+      base: v(s.base), maint: v(s.maint), elBase: v(s.elBase), hpMaint: v(s.hpMaint),
+    };
+  }
+
+  // ---------------------------------------------------------------- Diagramm
+  function chartSvg(r, { big = false } = {}) {
+    const W = 640, H = big ? 215 : 300, L = 58, R = 16, T = 16, B = 34;
+    const pw = W - L - R, ph = H - T - B;
+    const maxV = Math.max(...r.cumOld, ...r.cumNew, 1);
+    const step = niceStep(maxV / 4);
+    const ymax = Math.ceil(maxV / step) * step;
+    const X = (y) => L + (pw * y) / r.years;
+    const Y = (v) => T + ph * (1 - v / ymax);
+    const pts = (a) => a.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    let g = '';
+    for (let v = 0; v <= ymax + 1; v += step) {
+      g += `<line x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" class="grid"/>` +
+        `<text x="${L - 8}" y="${(Y(v) + 4).toFixed(1)}" class="ax" text-anchor="end">${nfn(v / 1000, 1)} T€</text>`;
+    }
+    const xStep = r.years > 20 ? 10 : 5;
+    for (let y = 0; y <= r.years; y += xStep) g += `<text x="${X(y).toFixed(1)}" y="${H - 14}" class="ax" text-anchor="middle">${y}</text>`;
+    g += `<text x="${W - R}" y="${H - 1}" class="ax" text-anchor="end">Jahre</text>`;
+    let gain = '';
+    let be = '';
+    if (r.breakEven !== null) {
+      const b = r.breakEven;
+      const i = Math.floor(b);
+      const bv = r.cumOld[i] + (r.cumOld[Math.min(i + 1, r.years)] - r.cumOld[i]) * (b - i);
+      const upper = [`${X(b).toFixed(1)},${Y(bv).toFixed(1)}`];
+      for (let y = i + 1; y <= r.years; y++) upper.push(`${X(y).toFixed(1)},${Y(r.cumOld[y]).toFixed(1)}`);
+      const lower = [];
+      for (let y = r.years; y > i; y--) lower.push(`${X(y).toFixed(1)},${Y(r.cumNew[y]).toFixed(1)}`);
+      gain = `<polygon points="${upper.concat(lower).join(' ')}" class="gain"/>`;
+      if (b > 0) {
+        const bx = X(b);
+        const boxX = bx > W / 2 ? bx - 158 : bx + 12;
+        be = `<line x1="${bx.toFixed(1)}" x2="${bx.toFixed(1)}" y1="${T}" y2="${H - B}" class="be"/>` +
+          `<circle cx="${bx.toFixed(1)}" cy="${Y(bv).toFixed(1)}" r="6" class="be-dot"/>` +
+          `<g transform="translate(${boxX.toFixed(1)},${T + 4})"><rect width="146" height="42" rx="8" class="be-box"/>` +
+          `<text x="12" y="17" class="be-t1">Ab hier im Plus</text><text x="12" y="34" class="be-t2">nach ca. ${nfn(Math.ceil(b), 0)} Jahren</text></g>`;
+      }
+    }
+    const lastGain = r.total > 0
+      ? `<text x="${(W - R - 4).toFixed(1)}" y="${(Y((r.cumOld[r.years] + r.cumNew[r.years]) / 2) + 5).toFixed(1)}" text-anchor="end" style="font-size:14px;font-weight:800;fill:#0B4F4A">+${eurR(r.total, 100)}</text>`
+      : '';
+    return `<svg viewBox="0 0 ${W} ${H}" data-ymax="${ymax}" class="chart" role="img" aria-label="Gesamtkosten über ${r.years} Jahre: ${esc(r.c.name)} ${eur(r.cumOld[r.years])}, Wärmepumpe ${eur(r.cumNew[r.years])}">
+      ${g}${gain}<polyline points="${pts(r.cumOld)}" class="l-old"/><polyline points="${pts(r.cumNew)}" class="l-new"/>${be}${lastGain}
+      <g class="hover" visibility="hidden"><line class="hl" y1="${T}" y2="${H - B}"/><circle r="5" class="d-old"/><circle r="5" class="d-new"/></g>
+    </svg>`;
+    function niceStep(x) {
+      const p = Math.pow(10, Math.floor(Math.log10(x)));
+      return [1, 2, 2.5, 5, 10].map((m) => m * p).find((v) => v >= x) || 10 * p;
+    }
+  }
+
+  function bindChartHover(r) {
+    const box = $('chartbox');
+    const svg = box.querySelector('svg');
+    const hov = svg.querySelector('.hover');
+    let tipEl = box.querySelector('.ctip');
+    if (!tipEl) { tipEl = document.createElement('div'); tipEl.className = 'ctip'; box.appendChild(tipEl); }
+    tipEl.hidden = true;
+    const vb = svg.viewBox.baseVal;
+    const L = 58, R = 16, T = 16, B = 34, pw = vb.width - L - R, ph = vb.height - T - B;
+    const maxY = Number(svg.dataset.ymax);
+    const show = (clientX) => {
+      const rect = svg.getBoundingClientRect();
+      const x = ((clientX - rect.left) / rect.width) * vb.width;
+      const y = Math.max(0, Math.min(r.years, Math.round(((x - L) / pw) * r.years)));
+      const X = L + (pw * y) / r.years;
+      const Y = (v) => T + ph * (1 - v / maxY);
+      hov.setAttribute('visibility', 'visible');
+      hov.querySelector('line').setAttribute('x1', X); hov.querySelector('line').setAttribute('x2', X);
+      const [co, cn] = hov.querySelectorAll('circle');
+      co.setAttribute('cx', X); co.setAttribute('cy', Y(r.cumOld[y]));
+      cn.setAttribute('cx', X); cn.setAttribute('cy', Y(r.cumNew[y]));
+      const diff = r.cumOld[y] - r.cumNew[y];
+      tipEl.innerHTML = `<div class="h">${y === 0 ? 'Start' : 'Nach ' + y + (y === 1 ? ' Jahr' : ' Jahren')}</div>
+        <div><span style="color:var(--old-ink)">${esc(r.c.name)}</span><b>${eur(r.cumOld[y])}</b></div>
+        <div><span style="color:var(--accent-ink)">Wärmepumpe</span><b>${eur(r.cumNew[y])}</b></div>
+        <div class="tot"><span>${diff >= 0 ? 'Vorteil Wärmepumpe' : 'Noch offen'}</span><b style="color:${diff >= 0 ? 'var(--accent-ink)' : 'var(--old-ink)'}">${eur(Math.abs(diff))}</b></div>`;
+      tipEl.hidden = false;
+      const px = (X / vb.width) * rect.width;
+      const left = px > rect.width / 2 ? px - tipEl.offsetWidth - 12 : px + 12;
+      tipEl.style.left = Math.max(0, left) + 'px';
+    };
+    const hide = () => { hov.setAttribute('visibility', 'hidden'); tipEl.hidden = true; };
+    svg.addEventListener('pointermove', (e) => show(e.clientX));
+    svg.addEventListener('pointerdown', (e) => show(e.clientX));
+    svg.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
+  }
+
+  // ---------------------------------------------------------------- Ausgabe
+  function yearsText(b) {
+    if (b === null) return null;
+    if (b <= 0) return 'sofort';
+    const n = Math.ceil(b);
+    return `${n} ${n === 1 ? 'Jahr' : 'Jahren'}`;
+  }
+
+  function update() {
+    const r = calc();
+    document.querySelectorAll('[data-years]').forEach((e) => (e.textContent = r.years));
+    $('legOld').textContent = (r.newFossil ? 'Neue ' : '') + r.c.name + (r.newFossil ? ' kaufen' : ' weiterbetreiben');
+    $('subsidyLabel').textContent = `Zuschuss ${r.rate} % von ${eur(Math.min(r.invest, Number.isFinite(s.cap) ? s.cap : 28000))}`;
+    $('subsidyOut').textContent = '− ' + eur(r.subsidy);
+    $('ownOut').textContent = eur(r.own);
+
+    const be = yearsText(r.breakEven);
+    const good = r.saving1 > 0;
+    $('kpis').innerHTML = `
+      <div class="kpi ${good ? 'hero' : 'bad'}"><div class="v">${good ? eur(r.saving1) : '– ' + eur(-r.saving1)}</div><div class="t">${good ? 'weniger Heizkosten im 1. Jahr' : 'Mehrkosten im 1. Jahr'}</div></div>
+      <div class="kpi"><div class="v">${r.breakEven === null ? `> ${r.years} J.` : r.breakEven <= 0 ? 'sofort' : '≈ ' + Math.ceil(r.breakEven) + (Math.ceil(r.breakEven) === 1 ? ' Jahr' : ' Jahre')}</div><div class="t">bis sich die Wärmepumpe bezahlt macht</div></div>
+      <div class="kpi"><div class="v">${r.total >= 0 ? eur(r.total) : '– ' + eur(-r.total)}</div><div class="t">${r.total >= 0 ? 'Vorteil' : 'Nachteil'} nach ${r.years} Jahren</div></div>
+      <div class="kpi"><div class="v">− ${nf1.format(Math.max(0, r.co2))} t</div><div class="t">CO₂ pro Jahr</div></div>`;
+
+    $('chartbox').innerHTML = chartSvg(r);
+    bindChartHover(r);
+
+    const maxY = Math.max(r.yearOld[0], r.yearNew[0], 1);
+    const bar = (label, parts, total, colors) => `<div class="brow"><span>${esc(label)}</span>
+      <div class="btrack" style="width:${(total / maxY) * 100}%">${parts.map((p, i) => `<span style="width:${total ? (p / total) * 100 : 0}%;background:${colors[i]}"></span>`).join('')}</div>
+      <span class="val">${eur(total)}</span></div>`;
+    $('bars').innerHTML =
+      bar(r.c.name, [r.fuelCost, r.base, r.maint], r.yearOld[0], ['#C2410C', '#EA8A5B', '#F6C7A9']) +
+      bar('Wärmepumpe', [r.elCost, r.elBase, r.hpMaint], r.yearNew[0], ['#0F766E', '#4FA79E', '#A9D8D2']);
+
+    const story = $('story');
+    story.className = 'story' + (good && r.breakEven !== null ? '' : ' warn');
+    story.innerHTML = good
+      ? `<h3>So rechnet sich die Wärmepumpe</h3><p>Die ${esc(r.c.name)} kostet heute rund <b>${eur(r.yearOld[0])} im Jahr</b>. Die Wärmepumpe braucht für dieselbe Wärme etwa ${nf0.format(Math.round(r.hpKwh / 10) * 10)} kWh Strom und kostet rund <b>${eur(r.yearNew[0])} im Jahr</b>. ${r.newFossil ? `Gegenüber einer neuen ${esc(r.c.name)} (${eur(r.sowieso)}) kostet sie nach Förderung ${eur(r.own - r.sowieso)} mehr` : `Nach Förderung zahlt der Kunde <b>${eur(r.own)}</b> selbst`}. ${r.breakEven !== null ? (r.breakEven <= 0 ? 'Sie ist damit <b>von Anfang an günstiger</b>.' : `Das ist nach etwa <b>${be}</b> durch die Ersparnis wieder drin, danach bleibt jedes Jahr mehr im Geldbeutel.`) : `Innerhalb von ${r.years} Jahren holt die Ersparnis die Anschaffung noch nicht ganz ein.`}</p>`
+      : `<h3>Hinweis</h3><p>Mit diesen Werten ist die Wärmepumpe im Betrieb nicht günstiger. Prüfen Sie Strompreis (Wärmepumpentarif?), Jahresarbeitszahl und den Verbrauch.</p>`;
+
+    $('assumptions').textContent = `Annahmen: ${r.c.label} +${nfn(s.escOld, 1)} %/Jahr (inkl. CO₂-Preis), Strom +${nfn(s.escEl, 1)} %/Jahr, Grundpreise & Wartung +2 %/Jahr, Wirkungsgrad ${nfn(s.eff, 0)} %, Wärmebedarf ${nf0.format(Math.round(r.heat / 100) * 100)} kWh/Jahr. Schätzung ohne Gewähr, ersetzt keine Heizlastberechnung. Förderung nach KfW 458, Stand 18.11.2026.`;
+
+    renderPrint(r);
+  }
+
+  // ---------------------------------------------------------------- Kunden-Ausdruck
+  function renderPrint(r) {
+    const be = yearsText(r.breakEven);
+    const today = new Date().toLocaleDateString('de-DE');
+    const good = r.saving1 > 0;
+    const monthly = r.saving1 / 12;
+    $('print').innerHTML = `
+      <div class="p-head"><div><div class="k">Ihre Heizkosten im Vergleich</div></div>
+        <div class="who">${s.customer ? `<b>${esc(s.customer)}</b><br>` : ''}${today}<br>Daniel Schultes · Heizung &amp; Elektrik</div></div>
+      <div class="p-title">${good ? 'Mit der Wärmepumpe heizen Sie günstiger' : 'Ihr Heizkosten-Vergleich'}</div>
+      <p class="p-sub">Heute: ${esc(r.c.name)} · Neu: Wärmepumpe · Vergleich über ${r.years} Jahre</p>
+      ${good ? `<div class="p-hero"><div class="big">${eurR(r.saving1)}</div><div class="txt"><b>weniger Heizkosten – jedes Jahr</b>Das sind rund ${eurR(monthly, 5)} im Monat, die Ihnen bleiben.</div></div>` : ''}
+      <div class="p-cmp">
+        <div class="p-col old"><div class="tag">Heute</div><div class="name">${esc(r.c.name)}</div>
+          <div class="amount">${eurR(r.yearOld[0])}</div><div class="per">Heizkosten pro Jahr</div>
+          <ul><li>abhängig von ${r.c.fossil ? 'Gas- und Ölpreisen' : 'Ihrem Versorger'}</li>${r.c.fossil ? '<li>CO₂-Preis steigt jedes Jahr</li>' : ''}<li>${eurR(r.cumOld[r.years], 100)} in ${r.years} Jahren</li></ul></div>
+        <div class="p-col new"><span class="badge">Empfehlung</span><div class="tag">Neu</div><div class="name">Wärmepumpe</div>
+          <div class="amount">${eurR(r.yearNew[0])}</div><div class="per">Heizkosten pro Jahr</div>
+          <ul><li>heizt mit Umweltwärme aus der Luft</li><li>${r.rate} % Förderung vom Staat</li><li>${eurR(r.cumNew[r.years], 100)} in ${r.years} Jahren – inkl. Anschaffung</li></ul></div>
+      </div>
+      <div class="p-facts">
+        <div class="p-fact green"><b>${eurR(r.subsidy, 100)}</b><span>Zuschuss vom Staat (KfW)</span></div>
+        <div class="p-fact"><b>${be ? (r.breakEven <= 0 ? 'sofort' : 'nach ' + be) : `nach über ${r.years} Jahren`}</b><span>hat sich die Wärmepumpe bezahlt gemacht</span></div>
+        <div class="p-fact green"><b>${r.total > 0 ? '+ ' + eurR(r.total, 100) : eurR(r.total, 100)}</b><span>mehr in Ihrer Tasche nach ${r.years} Jahren</span></div>
+      </div>
+      <div class="p-chart"><h3>So entwickeln sich Ihre Kosten</h3>
+        <div class="legend" style="font-size:9pt"><span style="--c:#C2410C">${esc(r.c.name)}</span><span style="--c:#0F766E">Wärmepumpe (inkl. Anschaffung nach Förderung)</span></div>
+        ${chartSvg(r, { big: true })}</div>
+      <div class="p-why">
+        <div><b>Unabhängiger</b>Kein Gas, kein Öl, keine Tankfüllung mehr.</div>
+        <div><b>Klimafreundlich</b>Rund ${nf1.format(Math.max(0, r.co2))} t weniger CO₂ pro Jahr.</div>
+        <div><b>Förderung sichern</b>${klimaActive() ? 'Klimabonus nur bei Antrag bis 31.01.2027.' : 'Antrag vor Auftragsbeginn stellen.'}</div>
+      </div>
+      <div class="p-foot">Grundlage: Ihre Angaben (Verbrauch ${nf0.format(s.consumption)} ${r.c.unit}/Jahr) und Annahmen zu Preissteigerungen (${r.c.label} +${nfn(s.escOld, 1)} %, Strom +${nfn(s.escEl, 1)} % pro Jahr). Investition ${eur(r.invest)}, Eigenanteil nach Förderung ${eur(r.own)}${r.newFossil ? `, verglichen mit einer neuen ${esc(r.c.name)} für ${eur(r.sowieso)}` : ''}. Unverbindliche Schätzung, ersetzt keine Heizlastberechnung. Förderung nach KfW 458, Stand 18.11.2026.</div>`;
+  }
+
+  $('printBtn').addEventListener('click', () => {
+    const t = document.title;
+    if (s.customer) document.title = 'Heizkosten-Vergleich ' + s.customer;
+    window.print();
+    setTimeout(() => (document.title = t), 1000);
+  });
+
+  // ---------------------------------------------------------------- Erklärungen (Hover, Fokus, Tippen)
+  const tip = $('tip');
+  let pinned = null;
+  let current = null;
+  function showTip(btn) {
+    current = btn;
+    const t = TIPS[btn.dataset.tip];
+    if (!t) return;
+    tip.innerHTML = `<b>${esc(t[0])}</b>${esc(t[1])}`;
+    tip.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const w = Math.min(320, window.innerWidth - 24);
+    tip.style.maxWidth = w + 'px';
+    let left = r.left + r.width / 2 - w / 2;
+    left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
+    tip.style.left = left + 'px';
+    const h = tip.offsetHeight;
+    tip.style.top = (r.bottom + 8 + h > window.innerHeight ? r.top - h - 8 : r.bottom + 8) + 'px';
+  }
+  function hideTip() { tip.hidden = true; if (pinned) pinned.setAttribute('aria-expanded', 'false'); pinned = null; }
+  document.addEventListener('mouseover', (e) => { const b = e.target.closest('.i[data-tip]'); if (b && !pinned) showTip(b); });
+  document.addEventListener('mouseout', (e) => { const b = e.target.closest('.i[data-tip]'); if (b && !pinned) tip.hidden = true; });
+  document.addEventListener('focusin', (e) => { const b = e.target.closest('.i[data-tip]'); if (b) showTip(b); });
+  document.addEventListener('focusout', (e) => { if (e.target.closest('.i[data-tip]') && !pinned) tip.hidden = true; });
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.i[data-tip]');
+    if (b) {
+      e.preventDefault();
+      if (pinned === b) return hideTip();
+      hideTip();
+      pinned = b;
+      b.setAttribute('aria-expanded', 'true');
+      showTip(b);
+    } else if (pinned) hideTip();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
+  window.addEventListener('scroll', () => { if (!tip.hidden && current) showTip(current); }, { passive: true });
+  document.querySelectorAll('.i[data-tip]').forEach((b) => { b.setAttribute('aria-label', 'Erklärung: ' + (TIPS[b.dataset.tip] || [''])[0]); });
+
+  fillForm();
+  update();
+})();
+</script>
+</body>
+</html>

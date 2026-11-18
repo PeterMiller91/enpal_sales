@@ -843,6 +843,9 @@
         ${archivedRows.length ? `<details class="card archive-box"><summary><h2>Archiv</h2><span class="small-muted">${archivedRows.length}</span></summary>
           <div class="customers">${archivedRows.map((r) => r.html).join('')}</div>
           <p class="legend">Wischen: nach rechts → wiederherstellen, nach links ← löschen</p></details>` : ''}
+        <section class="card" style="gap:8px"><h2>Für das Kundengespräch</h2>
+          <a class="btn" href="wirtschaftlichkeit/">Wirtschaftlichkeitsrechner</a>
+          <a class="btn" href="faq/">FAQ Wärmepumpe (100 Antworten)</a></section>
         ${auth.user ? `<p class="sub">Angemeldet als ${esc(auth.user)} · <button class="btn small" data-action="logout">Abmelden</button></p>` : ''}
       </main>
       <footer class="actions"><button class="btn primary big" data-action="new">Neuer Check</button></footer>`;
