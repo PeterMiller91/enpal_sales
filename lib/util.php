@@ -37,13 +37,14 @@ function load_config(): array
     $defaults = [
         'users' => [],
         'secret' => '',
-        'data_dir' => dirname(__DIR__, 2) . '/baubarkeits-daten/kunden',
+        'data_dir' => dirname(__DIR__) . '/daten/kunden',
         'company_name' => '[FIRMENNAME]',
         'logo_path' => '',
         'min_width_cm' => 0,
         'max_upload_mb' => 1024,
     ];
     $cfg = array_merge($defaults, is_array($cfg) ? $cfg : []);
+    $cfg['data_dir'] = resolve_data_dir((string)$cfg['data_dir']);
     if (strlen((string)$cfg['secret']) < 16 || str_starts_with((string)$cfg['secret'], 'BITTE-AENDERN')) {
         throw new HttpError(500, 'In config.php fehlt ein eigener "secret"-Wert.');
     }
@@ -164,18 +165,35 @@ function ftp_path(string $abs): string
     return preg_match('#/vhosts/[^/]+(/.*)$#', $abs, $m) ? $m[1] : $abs;
 }
 
+function within_open_basedir(string $dir): bool
+{
+    $ob = (string)ini_get('open_basedir');
+    if ($ob === '') return true;
+    foreach (explode(PATH_SEPARATOR, $ob) as $allowed) {
+        $allowed = rtrim(trim($allowed), '/');
+        if ($allowed !== '' && ($dir === $allowed || str_starts_with($dir, $allowed . '/'))) return true;
+    }
+    return false;
+}
+
+/**
+ * Hosts like Netcup only let PHP reach the web root (open_basedir = httpdocs).
+ * Then use httpdocs/daten/kunden: visible via FTP, blocked for web visitors by .htaccess.
+ */
+function resolve_data_dir(string $dir): string
+{
+    if (within_open_basedir($dir)) return $dir;
+    $fallback = dirname(__DIR__) . '/daten/kunden';
+    return within_open_basedir($fallback) ? $fallback : $dir;
+}
+
 /** Human-readable reason why PHP cannot use $dir. */
 function dir_problem(string $dir): string
 {
     $show = ftp_path($dir) !== $dir ? '"' . ftp_path($dir) . '" (Server-Pfad ' . $dir . ')' : '"' . $dir . '"';
     $ob = (string)ini_get('open_basedir');
     if ($ob !== '') {
-        $inside = false;
-        foreach (explode(PATH_SEPARATOR, $ob) as $allowed) {
-            $allowed = rtrim(trim($allowed), '/');
-            if ($allowed !== '' && ($dir === $allowed || str_starts_with($dir, $allowed . '/'))) $inside = true;
-        }
-        if (!$inside) {
+        if (!within_open_basedir($dir)) {
             return "Datenordner $show liegt außerhalb des für PHP erlaubten Bereichs (open_basedir: $ob). "
                 . 'In config.php bei data_dir einen Ordner innerhalb davon eintragen.';
         }
@@ -220,7 +238,10 @@ final class Store
         $this->tmp = $this->dir . '/.tmp';
         if (!is_dir($this->tmp)) @mkdir($this->tmp, 0775, true);
         // In case data_dir lies inside the web root: never serve it directly.
-        if (!is_file($this->dir . '/.htaccess')) @file_put_contents($this->dir . '/.htaccess', "Require all denied\nDeny from all\n");
+        $deny = "Require all denied\n";
+        if (!is_file($this->dir . '/.htaccess')) @file_put_contents($this->dir . '/.htaccess', $deny);
+        $parent = dirname($this->dir);
+        if (basename($parent) === 'daten' && !is_file($parent . '/.htaccess')) @file_put_contents($parent . '/.htaccess', $deny);
         if (random_int(1, 50) === 1) $this->cleanupTmp();
     }
 

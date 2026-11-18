@@ -16,10 +16,11 @@ return [
     // Erzeugen z. B. mit: php -r "echo bin2hex(random_bytes(32));"
     'secret' => 'BITTE-AENDERN-langer-zufallswert',
 
-    // Ordner für die Kundenordner. Standard: neben dem Web-Verzeichnis der Subdomain,
-    // also per FTP sichtbar, aber nicht über die Webseite aufrufbar.
-    // Beispiel Netcup: /check.meine-domain.de  (Web)  →  /baubarkeits-daten/kunden  (Daten)
-    'data_dir' => dirname(__DIR__) . '/baubarkeits-daten/kunden',
+    // Ordner für die Kundenordner (per FTP sichtbar, über die Webseite gesperrt).
+    // Standard: "daten/kunden" im Web-Verzeichnis, gesperrt per .htaccess.
+    // Darf PHP auch außerhalb schreiben, geht z. B. dirname(__DIR__) . '/baubarkeits-daten/kunden'.
+    // Liegt der Pfad außerhalb des erlaubten Bereichs (open_basedir), nimmt die App automatisch daten/kunden.
+    'data_dir' => __DIR__ . '/daten/kunden',
 
     // Erscheint im Kopf des Berichts.
     'company_name' => '[FIRMENNAME]',

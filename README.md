@@ -56,12 +56,13 @@ Fertig: `https://check.meine-domain.de` aufrufen, anmelden und am Handy „Zum S
 
 ## Wo liegen die Daten? (FTP)
 
-Standardmäßig **neben** dem Dokumentstamm. Per FTP sieht man die Daten, über die Webseite sind sie nicht erreichbar:
+Im Web-Verzeichnis der Subdomain im Ordner **`daten/kunden`**. Per FTP sieht man ihn, über die Webseite ist er gesperrt
+(`.htaccess`: „Require all denied“). Bei Netcup darf PHP nur innerhalb von `httpdocs` schreiben (open_basedir),
+deshalb liegt der Ordner dort.
 
 ```
-/                                         ← FTP-Wurzel des Webspace
-├── check.meine-domain.de/                ← App (aus Git)
-└── baubarkeits-daten/kunden/             ← Kundenordner
+/bau.meine-domain.de/httpdocs/            ← App (aus Git)
+└── daten/kunden/                         ← Kundenordner (wird automatisch angelegt)
     └── K-2026-0412_Familie_Beispiel/     ← Kunden-Nr. + Name
         └── 2026-11-17/                   ← Termin-Datum
             ├── check.json                ← alle Daten & Maße
@@ -75,12 +76,13 @@ Standardmäßig **neben** dem Dokumentstamm. Per FTP sieht man die Daten, über 
 
 Dateinamen: `<Kunde>_<Datum>_<Uhrzeit der Aufnahme>_<Bezeichnung>_<ID>`. So bleiben Fotos auch nach dem Herauskopieren eindeutig zuzuordnen.
 
-Einen anderen Ort stellt man in `config.php` mit `data_dir` ein.
+`daten/` steht in `.gitignore`. Ein Git-Pull rührt die Kundendaten also nicht an.
 
-**Meldung „Server-Speicher nicht bereit“?** Die App nennt den genauen Grund und Pfad. Meist hilft:
-1. Per FTP den Ordner anlegen (z. B. `/baubarkeits-daten/kunden`). Der FTP-Benutzer ist bei Plesk derselbe wie der PHP-Benutzer, PHP darf den Ordner dann beschreiben.
-2. Falls nötig, die Rechte des Ordners im FTP-Programm auf `775` setzen.
-3. Heißt es „außerhalb des für PHP erlaubten Bereichs“, in `config.php` einen Pfad innerhalb des genannten Bereichs eintragen. Bei Netcup ist das meist `/var/www/vhosts/<domain>/…`.
+**Wichtig:** In Plesk unter *Apache & nginx* die Option „Statische Dateien direkt durch nginx verarbeiten“ **ausgeschaltet** lassen.
+Sonst greift die Sperre per `.htaccess` für Fotos nicht.
+
+Einen anderen Ort stellt man in `config.php` mit `data_dir` ein. Liegt er außerhalb des für PHP erlaubten Bereichs,
+nimmt die App automatisch `daten/kunden`. Ist der Ordner nicht nutzbar, zeigt die App nach dem Login den genauen Grund an.
 
 ## Updates
 
