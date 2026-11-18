@@ -101,3 +101,29 @@ footer.actions.stack { flex-direction: column; }
 
 #toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); z-index: 20; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Kundenliste mit Ampel */
+.customers { display: flex; flex-direction: column; gap: 8px; }
+.customer { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); border-left-width: 6px; color: inherit; text-decoration: none; background: #fff; }
+.customer .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.customer .title { font-size: 15px; font-weight: 600; }
+.customer .small { font-size: 12px; color: var(--muted); }
+.customer .missing { color: var(--text); }
+.customer .dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.customer .status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.customer .badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.customer .count { font-size: 12px; font-weight: 600; color: var(--muted); }
+.customer.green { border-left-color: #16A34A; }
+.customer.green .dot { background: #16A34A; }
+.customer.green .badge { background: #DCFCE7; color: #14532D; }
+.customer.yellow { border-left-color: #EAB308; background: #FFFDF2; }
+.customer.yellow .dot { background: #EAB308; }
+.customer.yellow .badge { background: #FEF3C7; color: #713F12; }
+.customer.red { border-left-color: #DC2626; background: #FFF8F8; }
+.customer.red .dot { background: #DC2626; }
+.customer.red .badge { background: #FEE2E2; color: #991B1B; }
+.small-muted { font-size: 13px; font-weight: 600; color: var(--muted); }
+.legend { margin: 0; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.legend .lg { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; }
+.legend .lg:first-child { margin-left: 0; }
+.lg.green { background: #16A34A; } .lg.yellow { background: #EAB308; } .lg.red { background: #DC2626; }

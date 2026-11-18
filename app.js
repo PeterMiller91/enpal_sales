@@ -162,6 +162,27 @@
 
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+  /**
+   * Ampel pro Kunde: grün = alle 6 Schritte vollständig, gelb = 3–5 Schritte, rot = höchstens 2.
+   */
+  function checkStatus(c) {
+    const missingIdx = STEPS.map((s, i) => (stepDone(c, s.id) ? -1 : i)).filter((i) => i >= 0);
+    const done = STEPS.length - missingIdx.length;
+    const level = done === STEPS.length ? 'green' : done >= 3 ? 'yellow' : 'red';
+    return {
+      done,
+      level,
+      label: { green: 'Vollständig', yellow: 'Etwas fehlt', red: 'Ungenügend' }[level],
+      missing: missingIdx.map((i) => STEPS[i].title),
+      firstMissing: missingIdx.length ? missingIdx[0] + 1 : null,
+    };
+  }
+
+  function fmtDate(d) {
+    const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : d;
+  }
+
   function minWidth(check) {
     const ws = check.steps.weg.items
       .map((e) => Number(String(e.widthCm).replace(',', '.')))
@@ -770,23 +791,37 @@
   async function viewHome() {
     check = null;
     const checks = (await DB.allChecks()).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    const items = await Promise.all(
+    const rows = await Promise.all(
       checks.map(async (c) => {
         const pending = (await DB.mediaForCheck(c.id)).filter((m) => !m.uploaded).length;
-        const done = STEPS.filter((s) => stepDone(c, s.id)).length;
-        return `<a class="list-item" href="#/check/${c.id}/${c.customer.name ? 'step/1' : 'kunde'}">
-          <div class="grow"><div class="title">${esc(c.customer.name || 'Ohne Namen')}</div>
-          <div class="small">${esc(c.customer.address || '')}${c.customer.date ? ' · ' + esc(c.customer.date) : ''}</div></div>
-          <span class="pill ${pending ? 'todo' : 'ok'}">${pending ? pending + ' offen' : done + '/6'}</span></a>`;
+        const st = checkStatus(c);
+        // Open the first missing step; complete checks open the summary.
+        const target = !c.customer.name ? 'kunde' : st.firstMissing ? `step/${st.firstMissing}` : 'abschluss';
+        const html = `<a class="customer ${st.level}" href="#/check/${c.id}/${target}">
+          <span class="dot" aria-hidden="true"></span>
+          <div class="grow">
+            <div class="title">${esc(c.customer.name || 'Ohne Namen')}</div>
+            <div class="small">${esc(c.customer.address || '')}${c.customer.date ? ' · ' + esc(fmtDate(c.customer.date)) : ''}</div>
+            ${st.missing.length ? `<div class="small missing">Fehlt: ${esc(st.missing.join(', '))}</div>` : ''}
+            ${pending ? `<div class="small">${pending} Datei(en) noch nicht hochgeladen</div>` : ''}
+          </div>
+          <span class="status"><span class="badge">${st.label}</span><span class="count">${st.done}/6</span></span></a>`;
+        return { level: st.level, html };
       })
     );
+    const order = { red: 0, yellow: 1, green: 2 };
+    const open = rows.filter((r) => r.level !== 'green').sort((a, b) => order[a.level] - order[b.level]);
+    const complete = rows.filter((r) => r.level === 'green');
     $app.innerHTML = `
-      <header class="bar"><span class="kicker">Baubarkeits-Check</span><h1>Vor-Ort-Termine</h1></header>
+      <header class="bar"><span class="kicker">Baubarkeits-Check</span><h1>Hauptmenü</h1></header>
       <main>
         ${serverConfig.storageOk === false ? `<div class="hint warn" role="alert">${icon('warn')}<span><strong>Server-Speicher nicht bereit:</strong> ${esc(serverConfig.storageError || '')}</span></div>` : ''}
-        <section class="card"><h2>Meine Termine auf diesem Gerät</h2>
-          ${items.length ? `<div class="list">${items.join('')}</div>` : '<p class="sub">Noch keine Termine. Starte einen neuen Check.</p>'}
+        <section class="card"><div class="row"><h2>Offene Kunden</h2><span class="small-muted">${open.length}</span></div>
+          ${open.length ? `<div class="customers">${open.map((r) => r.html).join('')}</div>` : '<p class="sub">Keine offenen Kunden.</p>'}
+          <p class="legend"><span class="lg green"></span>vollständig <span class="lg yellow"></span>etwas fehlt <span class="lg red"></span>ungenügend</p>
         </section>
+        ${complete.length ? `<section class="card"><div class="row"><h2>Vollständig</h2><span class="small-muted">${complete.length}</span></div>
+          <div class="customers">${complete.map((r) => r.html).join('')}</div></section>` : ''}
         ${auth.user ? `<p class="sub">Angemeldet als ${esc(auth.user)} · <button class="btn small" data-action="logout">Abmelden</button></p>` : ''}
       </main>
       <footer class="actions"><button class="btn primary big" data-action="new">Neuer Check</button></footer>`;
@@ -1000,6 +1035,7 @@
       <footer class="actions stack">
         <button class="btn primary big" data-action="report">Bericht erstellen (PDF)</button>
         <button class="btn" data-action="share">Bericht teilen / per E-Mail senden</button>
+        <button class="btn" data-action="home">Zurück zum Hauptmenü</button>
       </footer>`;
     renderSync();
   }
@@ -1196,6 +1232,10 @@
         check.ui = { ...(check.ui || {}), side: btn.dataset.side };
         save();
         render();
+        break;
+      case 'home':
+        await save({ immediate: true });
+        location.hash = '#/';
         break;
       case 'skip-login':
         auth.skipped = true;
