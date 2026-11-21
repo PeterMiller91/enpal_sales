@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F766E">
+<meta name="theme-color" content="#0A2A5C">
 <meta name="description" content="100 Fragen und Antworten zur Wärmepumpe: Eignung im Altbau, Kosten, KfW-Förderung 2026, Stromverbrauch, Lautstärke und Einbau. Von Daniel Schultes.">
 <link rel="canonical" href="https://bau.danielschultes.com/faq">
 <meta property="og:title" content="Wärmepumpe: 100 Antworten für Hausbesitzer">
@@ -21,10 +21,10 @@
   --text: #14201D;
   --muted: #52605C;
   --line: #D5DDDA;
-  --accent: #0F766E;
-  --accent-dark: #0B5A54;
-  --accent-soft: #E6F2F0;
-  --accent-ink: #0B4F4A;
+  --accent: #0A2A5C;
+  --accent-dark: #061B3D;
+  --accent-soft: #E9EEF7;
+  --accent-ink: #0A2A5C;
   --warn-soft: #FDEBDD;
   --warn-ink: #8A3A06;
   color-scheme: light;
@@ -93,6 +93,19 @@ mark { background: var(--warn-soft); color: var(--warn-ink); border-radius: 3px;
 .btn.primary:hover { background: var(--accent-dark); }
 .mailrow code { font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 footer { color: var(--muted); font-size: 13px; padding: 20px 0 calc(40px + env(safe-area-inset-bottom)); }
+/* Farben: Blau (Hauptfarbe) & Gelb (Hervorhebung) */
+:root { --yellow: #FFD200; --yellow-hover: #F0C400; --yellow-soft: #FFF6CC; }
+header.bar { background: var(--accent); border-bottom: 3px solid var(--yellow); }
+header.bar .kicker { color: var(--yellow); }
+header.bar .brand { color: #C9D6EE; }
+header.bar .brand b { color: #fff; }
+h1 .temp { color: var(--accent); background: linear-gradient(transparent 62%, var(--yellow) 62%); padding: 0 2px; }
+.fact.hot { background: var(--yellow-soft); border-color: var(--yellow); }
+.fact.hot strong, .fact.hot span { color: var(--text); }
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--accent); }
+.btn.primary:hover { background: var(--yellow-hover); }
+details[open] summary .ic { background: var(--yellow); color: var(--accent); }
+mark { background: var(--yellow-soft); color: inherit; }
 @media (max-width: 480px) {
   summary { grid-template-columns: 26px 1fr 22px; }
   .ans { padding-left: 14px; }

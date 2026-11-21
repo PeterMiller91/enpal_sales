@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0F766E">
+<meta name="theme-color" content="#0A2A5C">
 <meta name="robots" content="noindex">
 <title>Wirtschaftlichkeit Wärmepumpe</title>
 <link rel="icon" href="../icon.svg" type="image/svg+xml">
@@ -11,7 +11,7 @@
 /* Design der Baubarkeits-Check-App */
 :root {
   --bg: #F4F6F5; --surface: #fff; --text: #14201D; --muted: #52605C; --line: #D5DDDA;
-  --accent: #0F766E; --accent-dark: #0B5A54; --accent-soft: #E6F2F0; --accent-ink: #0B4F4A;
+  --accent: #0A2A5C; --accent-dark: #061B3D; --accent-soft: #E9EEF7; --accent-ink: #0A2A5C;
   --old: #C2410C; --old-soft: #FDEBDD; --old-ink: #8A3A06;
   color-scheme: light;
 }
@@ -49,7 +49,7 @@ h3 { margin: 0; font-size: 15px; }
 .in:focus-within { outline: 2px solid var(--accent); border-color: var(--accent); }
 .in input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 16px; padding: 0 12px; background: none; color: var(--text); font-variant-numeric: tabular-nums; }
 .in .u { padding: 0 12px 0 4px; color: var(--muted); font-size: 13px; white-space: nowrap; }
-.in.changed { border-color: var(--accent); background: #FAFDFC; }
+.in.changed { border-color: var(--accent); background: #FAFBFE; }
 .help { font-size: 12px; color: var(--muted); }
 .help button.link { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; font-size: 12px; }
 .row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -57,7 +57,7 @@ h3 { margin: 0; font-size: 15px; }
 .i { width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--accent); background: #fff; color: var(--accent); font-size: 11px; font-weight: 700; font-style: normal; display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: help; }
 .i:hover, .i:focus-visible, .i[aria-expanded="true"] { background: var(--accent); color: #fff; outline: none; }
 #tip { position: fixed; z-index: 50; max-width: 320px; background: #14201D; color: #fff; border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.45; box-shadow: 0 8px 24px rgba(0,0,0,.2); pointer-events: none; }
-#tip b { color: #7DD3C8; display: block; margin-bottom: 2px; }
+#tip b { color: #FFD200; display: block; margin-bottom: 2px; }
 .range { display: flex; align-items: center; gap: 12px; }
 .range input { flex: 1; accent-color: var(--accent); height: 28px; }
 .range output { font-weight: 700; font-size: 18px; min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -85,7 +85,7 @@ details.adv[open] summary { margin-bottom: 10px; }
 .kpi .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .kpi .t { font-size: 12px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
 .kpi.hero { background: var(--accent); border-color: var(--accent); color: #fff; }
-.kpi.hero .t { color: #D1EDE9; }
+.kpi.hero .t { color: #C9D6EE; }
 .kpi.bad { background: var(--old-soft); border-color: #F2C8AC; }
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .legend span::before { content: ""; display: inline-block; width: 14px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--c); }
@@ -99,7 +99,7 @@ details.adv[open] summary { margin-bottom: 10px; }
 .chart .be { stroke: #14201D; stroke-dasharray: 4 4; }
 .chart .be-dot { fill: #fff; stroke: #14201D; stroke-width: 2; }
 .chart .be-box { fill: #14201D; }
-.chart .be-t1 { fill: #7DD3C8; font-size: 11px; font-weight: 700; }
+.chart .be-t1 { fill: #FFD200; font-size: 11px; font-weight: 700; }
 .chart .be-t2 { fill: #fff; font-size: 13px; font-weight: 700; }
 .chart .hl { stroke: #9AA8A4; }
 .chart .d-old { fill: var(--old); } .chart .d-new { fill: var(--accent); }
@@ -122,6 +122,18 @@ details.adv[open] summary { margin-bottom: 10px; }
 .note { font-size: 12px; color: var(--muted); margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* ---------------- Farben: Blau (Hauptfarbe) & Gelb (Hervorhebung) ---------------- */
+:root { --yellow: #FFD200; --yellow-hover: #F0C400; --yellow-soft: #FFF6CC; }
+header.bar { background: var(--accent); border-bottom: 3px solid var(--yellow); }
+header.bar .kicker { color: var(--yellow); }
+header.bar .links a { color: #fff; }
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--accent); }
+.btn.primary:hover { background: var(--yellow-hover); border-color: var(--yellow-hover); }
+.kpi.hero .v { color: var(--yellow); }
+.chart .gain { fill: var(--yellow); opacity: .45; }
+.chart .be-box { fill: var(--accent); }
+.range input { accent-color: var(--accent); }
+
 /* ---------------- Ausdruck für den Kunden ---------------- */
 .print { display: none; }
 @page { size: A4; margin: 12mm 14mm 10mm; }
@@ -131,40 +143,40 @@ details.adv[open] summary { margin-bottom: 10px; }
   .screen, #tip { display: none !important; }
   .print { display: block; color: #14201D; }
 }
-.p-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2pt solid #0F766E; padding-bottom: 8pt; }
-.p-head .k { font-size: 9pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #0F766E; }
+.p-head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3pt solid #FFD200; padding-bottom: 8pt; }
+.p-head .k { font-size: 9pt; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #0A2A5C; }
 .p-head .who { font-size: 10pt; color: #52605C; text-align: right; }
 .p-title { font-size: 21pt; font-weight: 700; line-height: 1.15; margin: 10pt 0 2pt; }
 .p-sub { font-size: 11pt; color: #52605C; margin: 0 0 12pt; }
-.p-hero { background: #0F766E; color: #fff; border-radius: 10pt; padding: 12pt 16pt; display: flex; align-items: center; justify-content: space-between; gap: 12pt; }
-.p-hero .big { font-size: 28pt; font-weight: 800; line-height: 1; }
+.p-hero { background: #0A2A5C; color: #fff; border-radius: 10pt; padding: 12pt 16pt; display: flex; align-items: center; justify-content: space-between; gap: 12pt; }
+.p-hero .big { font-size: 28pt; font-weight: 800; line-height: 1; color: #FFD200; }
 .p-hero .txt { font-size: 12pt; }
 .p-hero .txt b { display: block; font-size: 14pt; }
 .p-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; margin: 14pt 0 10pt; }
 .p-col { border-radius: 10pt; padding: 12pt 14pt; border: 1pt solid #D5DDDA; position: relative; }
 .p-col.old { background: #FAFAFA; color: #52605C; }
-.p-col.new { border: 2.5pt solid #0F766E; background: #E6F2F0; color: #0B4F4A; }
+.p-col.new { border: 2.5pt solid #0A2A5C; background: #E9EEF7; color: #0A2A5C; }
 .p-col .tag { font-size: 9pt; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .p-col .name { font-size: 14pt; font-weight: 700; margin: 2pt 0 8pt; color: #14201D; }
 .p-col .amount { font-size: 24pt; font-weight: 800; line-height: 1; }
 .p-col .per { font-size: 10pt; }
-.p-col .badge { position: absolute; top: -9pt; right: 12pt; background: #0F766E; color: #fff; font-size: 9pt; font-weight: 700; padding: 3pt 9pt; border-radius: 99pt; }
+.p-col .badge { position: absolute; top: -9pt; right: 12pt; background: #FFD200; color: #0A2A5C; font-size: 9pt; font-weight: 700; padding: 3pt 9pt; border-radius: 99pt; }
 .p-col ul { margin: 8pt 0 0; padding-left: 14pt; font-size: 10pt; }
 .p-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; margin-bottom: 8pt; }
 .p-fact { border: 1pt solid #D5DDDA; border-radius: 8pt; padding: 8pt 10pt; }
 .p-fact b { display: block; font-size: 15pt; }
 .p-fact span { font-size: 9.5pt; color: #52605C; }
-.p-fact.green { background: #E6F2F0; border-color: #0F766E; }
+.p-fact.green { background: #FFF6CC; border-color: #FFD200; }
 .p-chart h3 { font-size: 12pt; margin: 0 0 2pt; }
 .p-chart .chart .ax { font-size: 12px; }
 .p-why { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; margin-top: 10pt; }
-.p-why div { font-size: 10pt; border-left: 3pt solid #0F766E; padding: 2pt 0 2pt 8pt; }
+.p-why div { font-size: 10pt; border-left: 3pt solid #FFD200; padding: 2pt 0 2pt 8pt; }
 .p-why b { display: block; font-size: 10.5pt; }
 .p-page2 { break-before: page; page-break-before: always; padding-top: 2pt; }
 .p-page2 h2 { font-size: 16pt; margin: 10pt 0 8pt; display: block; }
 .p-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt 14pt; }
 .p-box { border: 1pt solid #D5DDDA; border-radius: 8pt; padding: 8pt 10pt; break-inside: avoid; }
-.p-box h3 { font-size: 10.5pt; margin: 0 0 4pt; color: #0F766E; text-transform: uppercase; letter-spacing: .04em; }
+.p-box h3 { font-size: 10.5pt; margin: 0 0 4pt; color: #0A2A5C; text-transform: uppercase; letter-spacing: .04em; }
 .p-box table { width: 100%; border-collapse: collapse; font-size: 10pt; }
 .p-box td { padding: 2.5pt 0; border-bottom: 0.5pt solid #EEF1F0; vertical-align: top; }
 .p-box tr:last-child td { border-bottom: 0; }
@@ -185,7 +197,7 @@ details.adv[open] summary { margin-bottom: 10px; }
 <div class="wrap">
   <section class="intro">
     <h1>Lohnt sich die Wärmepumpe?</h1>
-    <p class="lead">Die Felder sind mit Standardwerten vorbelegt. Überschreiben Sie sie mit den Zahlen des Kunden (geänderte Felder werden grün umrandet). Bei jedem <i class="i" aria-hidden="true" style="display:inline-flex">i</i> gibt es eine Erklärung. „Für den Kunden drucken“ erzeugt eine einfache Übersicht ohne Fachbegriffe.</p>
+    <p class="lead">Die Felder sind mit Standardwerten vorbelegt. Überschreiben Sie sie mit den Zahlen des Kunden (geänderte Felder werden blau umrandet). Bei jedem <i class="i" aria-hidden="true" style="display:inline-flex">i</i> gibt es eine Erklärung. „Für den Kunden drucken“ erzeugt eine einfache Übersicht ohne Fachbegriffe.</p>
   </section>
 
   <div class="layout">
@@ -613,7 +625,7 @@ details.adv[open] summary { margin-bottom: 10px; }
       }
     }
     const lastGain = r.total > 0
-      ? `<text x="${(W - R - 4).toFixed(1)}" y="${(Y((r.cumOld[r.years] + r.cumNew[r.years]) / 2) + 5).toFixed(1)}" text-anchor="end" style="font-size:14px;font-weight:800;fill:#0B4F4A">+${eurR(r.total, 100)}</text>`
+      ? `<text x="${(W - R - 4).toFixed(1)}" y="${(Y((r.cumOld[r.years] + r.cumNew[r.years]) / 2) + 5).toFixed(1)}" text-anchor="end" style="font-size:14px;font-weight:800;fill:#0A2A5C">+${eurR(r.total, 100)}</text>`
       : '';
     return `<svg viewBox="0 0 ${W} ${H}" data-ymax="${ymax}" class="chart" role="img" aria-label="Gesamtkosten über ${r.years} Jahre: ${esc(r.c.name)} ${eur(r.cumOld[r.years])}, Wärmepumpe ${eur(r.cumNew[r.years])}">
       ${g}${gain}<polyline points="${pts(r.cumOld)}" class="l-old"/><polyline points="${pts(r.cumNew)}" class="l-new"/>${be}${lastGain}
@@ -695,7 +707,7 @@ details.adv[open] summary { margin-bottom: 10px; }
       <span class="val">${eur(total)}</span></div>`;
     $('bars').innerHTML =
       bar(r.c.name, [r.fuelCost, r.base, r.maint], r.yearOld[0], ['#C2410C', '#EA8A5B', '#F6C7A9']) +
-      bar('Wärmepumpe', [r.elCost, r.elBase, r.hpMaint], r.yearNew[0], ['#0F766E', '#4FA79E', '#A9D8D2']);
+      bar('Wärmepumpe', [r.elCost, r.elBase, r.hpMaint], r.yearNew[0], ['#0A2A5C', '#3E63A8', '#AFC3E6']);
 
     const story = $('story');
     story.className = 'story' + (good && r.breakEven !== null ? '' : ' warn');
@@ -734,7 +746,7 @@ details.adv[open] summary { margin-bottom: 10px; }
         <div class="p-fact green"><b>${r.total > 0 ? '+ ' + eurR(r.total, 100) : eurR(r.total, 100)}</b><span>mehr in Ihrer Tasche nach ${r.years} Jahren</span></div>
       </div>
       <div class="p-chart"><h3>So entwickeln sich Ihre Kosten</h3>
-        <div class="legend" style="font-size:9pt"><span style="--c:#C2410C">${esc(r.c.name)}</span><span style="--c:#0F766E">Wärmepumpe (inkl. Anschaffung nach Förderung)</span></div>
+        <div class="legend" style="font-size:9pt"><span style="--c:#C2410C">${esc(r.c.name)}</span><span style="--c:#0A2A5C">Wärmepumpe (inkl. Anschaffung nach Förderung)</span></div>
         ${chartSvg(r, { big: true })}</div>
       <div class="p-why">
         <div><b>Unabhängiger</b>Kein Gas, kein Öl, keine Tankfüllung mehr.</div>

@@ -4,10 +4,10 @@
   --text: #14201D;
   --muted: #52605C;
   --line: #D5DDDA;
-  --accent: #0F766E;
-  --accent-dark: #0B5A54;
-  --accent-soft: #E6F2F0;
-  --accent-ink: #0B4F4A;
+  --accent: #0A2A5C;
+  --accent-dark: #061B3D;
+  --accent-soft: #E9EEF7;
+  --accent-ink: #0A2A5C;
   --warn-soft: #FDEBDD;
   --warn-ink: #8A3A06;
   --ph: #C9D3D0;
@@ -153,3 +153,26 @@ dialog.sheet h2 { font-size: 18px; margin-bottom: 6px; }
 dialog.sheet .sub { margin: 0 0 16px; line-height: 1.4; }
 .sheet-actions { display: flex; gap: 10px; }
 .sheet-actions .btn { flex: 1; }
+
+/* ---------------------------------------------------------------- Farben: Blau (Hauptfarbe) & Gelb (Hervorhebung) */
+:root {
+  --yellow: #FFD200;
+  --yellow-hover: #F0C400;
+  --yellow-soft: #FFF6CC;
+  --on-blue-muted: #C9D6EE;
+}
+/* Kopfleiste dunkelblau */
+header.bar { background: var(--accent); border-bottom: 3px solid var(--yellow); color: #fff; }
+header.bar h1 { color: #fff; }
+header.bar .kicker { color: var(--yellow); }
+header.bar .sub, header.bar .step-of, header.bar .sync { color: var(--on-blue-muted); }
+header.bar .sync.pending { color: var(--yellow); }
+header.bar .icon-btn { color: #fff; }
+header.bar .icon-btn:focus-visible { outline: 2px solid var(--yellow); }
+.progress span { background: rgba(255, 255, 255, .22); }
+.progress span.on { background: var(--yellow); }
+/* Haupt-Knöpfe gelb mit blauer Schrift */
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--accent); }
+.btn.primary:hover { background: var(--yellow-hover); border-color: var(--yellow-hover); }
+.bar-fill > span { background: var(--yellow); }
+.bar-fill { background: var(--accent-soft); }

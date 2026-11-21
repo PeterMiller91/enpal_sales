@@ -32,11 +32,11 @@ final class ReportPdf extends FPDF
  */
 function build_report(array $check, string $folder, callable $resolve, array $config, string $outFile): void
 {
-    $ACCENT = [15, 118, 110];
+    $ACCENT = [10, 42, 92];
     $MUTED = [82, 96, 92];
     $TEXT = [20, 32, 29];
     $LINE = [213, 221, 218];
-    $SOFT = [230, 242, 240];
+    $SOFT = [233, 238, 247];
     $PH = [227, 232, 230];
 
     $files = (array)($check['files'] ?? []);
@@ -260,8 +260,8 @@ function build_report(array $check, string $folder, callable $resolve, array $co
     ]);
     foreach ($lines as $l) $pdf->Cell($W, 13, pdf_text($l), 0, 1);
     $pdf->Ln(6);
-    $pdf->SetDrawColor(...$ACCENT);
-    $pdf->SetLineWidth(1.5);
+    $pdf->SetDrawColor(255, 210, 0);
+    $pdf->SetLineWidth(2.5);
     $pdf->Line($L, $pdf->GetY(), $L + $W, $pdf->GetY());
     $pdf->Ln(4);
     $color($TEXT);
