@@ -212,8 +212,10 @@
 
   function cacheMedia(rec) {
     const prev = media.get(rec.id);
-    if (prev && prev.thumbUrl) URL.revokeObjectURL(prev.thumbUrl);
+    if (prev && prev.thumbUrl && prev.thumbUrl.startsWith('blob:')) URL.revokeObjectURL(prev.thumbUrl);
     const thumbBlob = rec.thumb || (rec.kind === 'photo' ? rec.blob : null);
+    // Files captured on another device: preview straight from the server.
+    const remoteThumb = !thumbBlob && rec.remote && rec.hasPreview ? api(`checks/${rec.checkId}/files/${rec.id}`, '&thumb=1') : '';
     media.set(rec.id, {
       id: rec.id,
       kind: rec.kind,
@@ -222,7 +224,7 @@
       uploaded: !!rec.uploaded,
       error: rec.error || '',
       meta: rec.meta || {},
-      thumbUrl: thumbBlob ? URL.createObjectURL(thumbBlob) : '',
+      thumbUrl: thumbBlob ? URL.createObjectURL(thumbBlob) : remoteThumb,
     });
   }
 
@@ -329,13 +331,24 @@
       for (const c0 of checks) {
         // Use the in-memory version for the open check (it may be newer).
         const c = check && check.id === c0.id ? check : c0;
+        if (c.deletedAt) {
+          // Deleted here: tell the server (if it knows the customer), then forget it locally.
+          if (c.folder || c.serverUpdatedAt) await putCheck(c);
+          await purgeLocal(c.id);
+          continue;
+        }
         if (!c.customer.name.trim()) continue;
         if (c.dirty) {
           const stamp = c.updatedAt;
           const res = await putCheck(c);
           c.folder = res.folder;
+          c.serverUpdatedAt = res.updatedAt;
           if (c.updatedAt === stamp) c.dirty = false;
           await DB.putCheck(c);
+          if (res.deletedAt) {
+            await purgeLocal(c.id); // deleted on another device meanwhile
+            continue;
+          }
         }
         const pending = (await DB.mediaForCheck(c.id)).filter((m) => !m.uploaded);
         for (let i = 0; i < pending.length; i++) {
@@ -792,7 +805,13 @@
 
   async function viewHome() {
     check = null;
-    const checks = (await DB.allChecks()).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    // Show this device's list right away, then add customers from other devices.
+    pullFromServer().then((changed) => {
+      if (changed && (location.hash || '#/') === '#/' && !document.querySelector('.swipe.dragging, dialog[open]')) viewHome();
+    });
+    const checks = (await DB.allChecks())
+      .filter((c) => !c.deletedAt)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     const rows = await Promise.all(
       checks.map(async (c) => {
         const pending = (await DB.mediaForCheck(c.id)).filter((m) => !m.uploaded).length;
@@ -1166,17 +1185,95 @@
     const ok = await confirmSheet({
       title: 'Kunde löschen?',
       text:
-        `„${name}“ wird mit allen Fotos und Videos von diesem Gerät gelöscht.` +
-        (pending ? ` Achtung: ${pending} Datei(en) sind noch nicht hochgeladen und gehen verloren!` : ' Bereits hochgeladene Dateien bleiben im Kundenordner auf dem Server.') +
-        ' Das kann nicht rückgängig gemacht werden.',
+        `„${name}“ wird auf allen Geräten aus der Kundenliste entfernt. Hochgeladene Fotos und Dokumente bleiben im Kundenordner auf dem Server (FTP).` +
+        (pending ? ` Achtung: ${pending} Datei(en) sind noch nicht hochgeladen und gehen verloren!` : '') +
+        ' Das kann in der App nicht rückgängig gemacht werden.',
       ok: 'Endgültig löschen',
       danger: true,
     });
     if (!ok) return false;
-    for (const m of media) await DB.deleteMedia(m.id);
-    await DB.deleteCheck(id);
+    const c = await DB.getCheck(id);
+    if (!c) return false;
+    // Mark as deleted; the next sync tells the server, so it disappears on all devices.
+    c.deletedAt = new Date().toISOString();
+    c.dirty = true;
+    await DB.putCheck(c);
+    for (const m of media) if (!m.uploaded) await DB.deleteMedia(m.id);
+    scheduleSync(200);
     toast('Gelöscht');
     return true;
+  }
+
+  async function purgeLocal(id) {
+    for (const m of await DB.mediaForCheck(id)) await DB.deleteMedia(m.id);
+    await DB.deleteCheck(id);
+  }
+
+  // ---------------------------------------------------------------- customers from other devices
+
+  let lastPull = 0;
+  let pulling = false;
+
+  /** Store a check from the server on this device, with previews of its uploaded files. */
+  async function importServerCheck(data, local) {
+    const { files = {}, folder, ...rest } = data;
+    const c = { ...rest, folder, ui: (local && local.ui) || rest.ui, dirty: false, serverUpdatedAt: data.updatedAt };
+    await DB.putCheck(c);
+    const have = new Set((await DB.mediaForCheck(c.id)).map((m) => m.id));
+    for (const [fid, f] of Object.entries(files)) {
+      if (have.has(fid)) continue;
+      const mime = f.mime || '';
+      const kind = mime.startsWith('video/') ? 'video' : f.step === 'unterlagen' ? 'doc' : mime.startsWith('image/') ? 'photo' : 'doc';
+      await DB.putMedia({
+        id: fid,
+        checkId: c.id,
+        step: f.step,
+        label: f.label || '',
+        kind,
+        mime,
+        name: f.originalName || (f.path || '').split('/').pop(),
+        blob: null,
+        thumb: null,
+        uploaded: true,
+        remote: true,
+        hasPreview: mime.startsWith('image/') || !!f.poster,
+        meta: { takenAt: f.takenAt || undefined, lat: f.lat ?? undefined, lng: f.lng ?? undefined },
+        createdAt: f.uploadedAt || new Date().toISOString(),
+      });
+    }
+  }
+
+  /** Fetch the customer list from the server and bring this device up to date. Returns true if anything changed. */
+  async function pullFromServer({ force = false } = {}) {
+    if (pulling || !auth.user || !navigator.onLine) return false;
+    if (!force && Date.now() - lastPull < 20000) return false;
+    pulling = true;
+    let changed = false;
+    try {
+      const list = await apiFetch('checks');
+      lastPull = Date.now();
+      for (const item of list) {
+        const local = await DB.getCheck(item.id);
+        const pending = local ? (await DB.mediaForCheck(item.id)).some((m) => !m.uploaded) : false;
+        if (item.deletedAt) {
+          if (local && !local.dirty && !pending) {
+            await purgeLocal(item.id);
+            changed = true;
+          }
+          continue;
+        }
+        if (local && (local.dirty || local.deletedAt)) continue; // local changes win until they are synced
+        if (local && local.serverUpdatedAt && String(item.updatedAt) <= String(local.serverUpdatedAt)) continue;
+        const data = await apiFetch(`checks/${item.id}`);
+        await importServerCheck(data, local);
+        changed = true;
+      }
+    } catch (e) {
+      if (e.status !== 401) console.warn('Kundenliste vom Server nicht geladen:', e.message);
+    } finally {
+      pulling = false;
+    }
+    return changed;
   }
 
   let drag = null;

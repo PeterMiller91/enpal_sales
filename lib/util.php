@@ -300,7 +300,13 @@ final class Store
         $out = [];
         foreach (array_keys($this->index()) as $id) {
             $c = $this->read((string)$id);
-            if ($c) $out[] = ['id' => $id, 'folder' => $c['rel'], 'customer' => $c['data']['customer'] ?? [], 'updatedAt' => $c['data']['updatedAt'] ?? ''];
+            if ($c) $out[] = [
+                'id' => $id,
+                'folder' => $c['rel'],
+                'customer' => $c['data']['customer'] ?? [],
+                'updatedAt' => $c['data']['updatedAt'] ?? '',
+                'deletedAt' => $c['data']['deletedAt'] ?? null,
+            ];
         }
         usort($out, fn($a, $b) => strcmp((string)$b['updatedAt'], (string)$a['updatedAt']));
         return $out;
@@ -327,17 +333,47 @@ final class Store
                 $index[$id] = $rel;
                 $this->writeJson($this->dir . '/.index.json', $index);
             }
-            unset($body['dirty'], $body['folder']);
+            unset($body['dirty'], $body['folder'], $body['serverUpdatedAt']);
             // The server owns the record of uploaded files; the client owns the rest.
             $data = array_merge($body, [
                 'id' => $id,
                 'files' => $existing['files'] ?? new stdClass(),
                 'createdAt' => $existing['createdAt'] ?? gmdate('c'),
                 'updatedAt' => gmdate('c'),
+                // Deleted stays deleted, even if another device still sends its old copy.
+                'deletedAt' => $existing['deletedAt'] ?? ($body['deletedAt'] ?? null),
             ]);
             $this->writeJson($this->path($rel, 'check.json'), $data);
-            return ['ok' => true, 'folder' => $rel];
+            return ['ok' => true, 'folder' => $rel, 'updatedAt' => $data['updatedAt'], 'deletedAt' => $data['deletedAt']];
         });
+    }
+
+    /** Small JPEG preview (max. 480 px) for another device's list; cached in .tmp/thumbs. */
+    public function thumbnail(string $id, string $fileId, string $source): ?string
+    {
+        if (!function_exists('imagecreatetruecolor') || !is_file($source)) return null;
+        $dir = $this->tmp . '/thumbs';
+        if (!is_dir($dir)) @mkdir($dir, 0775, true);
+        $dest = "$dir/{$id}_{$fileId}.jpg";
+        if (is_file($dest) && filemtime($dest) >= filemtime($source)) return $dest;
+        $info = @getimagesize($source);
+        if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) return null;
+        $src = match ($info[2]) {
+            IMAGETYPE_JPEG => @imagecreatefromjpeg($source),
+            IMAGETYPE_PNG => @imagecreatefrompng($source),
+            default => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($source) : false,
+        };
+        if (!$src) return null;
+        $scale = min(1, 480 / max($info[0], $info[1]));
+        $w = max(1, (int)round($info[0] * $scale));
+        $h = max(1, (int)round($info[1] * $scale));
+        $dst = imagecreatetruecolor($w, $h);
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $w, $h, $info[0], $info[1]);
+        imagejpeg($dst, $dest, 75);
+        imagedestroy($src);
+        imagedestroy($dst);
+        return $dest;
     }
 
     private function tmpFile(string $id, string $fileId, string $part): string

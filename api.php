@@ -103,6 +103,12 @@ if (($parts[2] ?? '') === 'files' && isset($parts[3])) {
         $c = $store->read($id);
         $f = $c['data']['files'][$fileId] ?? null;
         if (!$f) throw new HttpError(404, 'Nicht gefunden');
+        if (!empty($_GET['thumb'])) {
+            $src = $store->path($c['rel'], !empty($f['poster']) ? $f['poster'] : $f['path']);
+            $thumb = $store->thumbnail($id, $fileId, $src);
+            if ($thumb) send_file($thumb, 'image/jpeg', 'vorschau.jpg');
+            throw new HttpError(404, 'Keine Vorschau');
+        }
         $rel = !empty($_GET['poster']) && !empty($f['poster']) ? $f['poster'] : $f['path'];
         send_file($store->path($c['rel'], $rel), !empty($_GET['poster']) ? 'image/jpeg' : ($f['mime'] ?: 'application/octet-stream'), basename($rel));
     }
