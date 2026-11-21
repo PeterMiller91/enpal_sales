@@ -3,7 +3,7 @@
   'use strict';
 
   const DB_NAME = 'baubarkeits-check';
-  const VERSION = 1;
+  const VERSION = 2;
   let dbPromise = null;
 
   function open() {
@@ -17,6 +17,12 @@
           const s = db.createObjectStore('media', { keyPath: 'id' });
           s.createIndex('checkId', 'checkId');
         }
+        // v2: changes waiting to be sent to the server, and small settings (last server revision …)
+        if (!db.objectStoreNames.contains('ops')) {
+          const s = db.createObjectStore('ops', { keyPath: 'opId' });
+          s.createIndex('checkId', 'checkId');
+        }
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
@@ -55,5 +61,13 @@
     putMedia: (m) => tx('media', 'readwrite', (s) => req2p(s.put(m))),
     deleteMedia: (id) => tx('media', 'readwrite', (s) => req2p(s.delete(id))),
     mediaForCheck: (checkId) => tx('media', 'readonly', (s) => req2p(s.index('checkId').getAll(checkId))),
+
+    putOp: (op) => tx('ops', 'readwrite', (s) => req2p(s.put(op))),
+    deleteOp: (id) => tx('ops', 'readwrite', (s) => req2p(s.delete(id))),
+    allOps: () => tx('ops', 'readonly', (s) => req2p(s.getAll())).then((a) => a.sort((x, y) => x.seq - y.seq)),
+    opsForCheck: (checkId) => tx('ops', 'readonly', (s) => req2p(s.index('checkId').getAll(checkId))).then((a) => a.sort((x, y) => x.seq - y.seq)),
+
+    getMeta: (key) => tx('meta', 'readonly', (s) => req2p(s.get(key))).then((r) => (r ? r.value : undefined)),
+    setMeta: (key, value) => tx('meta', 'readwrite', (s) => req2p(s.put({ key, value }))),
   };
 })();

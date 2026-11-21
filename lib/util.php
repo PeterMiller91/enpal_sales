@@ -226,8 +226,6 @@ final class Store
 {
     private string $dir;
     private string $tmp;
-    /** @var resource|null */
-    private $lock = null;
 
     public function __construct(string $dir)
     {
@@ -253,99 +251,6 @@ final class Store
             if ($seg === '..' || str_contains($seg, "\0") || str_contains($seg, '\\')) throw new HttpError(400, 'Ungültiger Pfad');
         }
         return $this->dir . '/' . ltrim($rel, '/');
-    }
-
-    private function locked(callable $fn)
-    {
-        $this->lock = fopen($this->dir . '/.lock', 'c');
-        flock($this->lock, LOCK_EX);
-        try {
-            return $fn();
-        } finally {
-            flock($this->lock, LOCK_UN);
-            fclose($this->lock);
-            $this->lock = null;
-        }
-    }
-
-    private function index(): array
-    {
-        $f = $this->dir . '/.index.json';
-        if (!is_file($f)) return [];
-        $d = json_decode((string)file_get_contents($f), true);
-        return is_array($d) ? $d : [];
-    }
-
-    private function writeJson(string $file, array $data): void
-    {
-        $tmp = $file . '.' . bin2hex(random_bytes(4));
-        if (file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) === false) {
-            throw new HttpError(500, 'Speichern fehlgeschlagen (Speicherplatz?)');
-        }
-        rename($tmp, $file);
-    }
-
-    public function read(string $id): ?array
-    {
-        $rel = $this->index()[$id] ?? null;
-        if (!$rel) return null;
-        $f = $this->path($rel, 'check.json');
-        if (!is_file($f)) return null;
-        $data = json_decode((string)file_get_contents($f), true);
-        return is_array($data) ? ['rel' => $rel, 'data' => $data] : null;
-    }
-
-    public function listChecks(): array
-    {
-        $out = [];
-        foreach (array_keys($this->index()) as $id) {
-            $c = $this->read((string)$id);
-            if ($c) $out[] = [
-                'id' => $id,
-                'folder' => $c['rel'],
-                'customer' => $c['data']['customer'] ?? [],
-                'updatedAt' => $c['data']['updatedAt'] ?? '',
-                'deletedAt' => $c['data']['deletedAt'] ?? null,
-            ];
-        }
-        usort($out, fn($a, $b) => strcmp((string)$b['updatedAt'], (string)$a['updatedAt']));
-        return $out;
-    }
-
-    public function save(string $id, array $body): array
-    {
-        return $this->locked(function () use ($id, $body) {
-            $index = $this->index();
-            $rel = $index[$id] ?? null;
-            $existing = [];
-            if ($rel) {
-                $c = $this->read($id);
-                if ($c) $existing = $c['data'];
-            } else {
-                $base = folder_name_for($body['customer']);
-                $day = date_segment($body['customer']);
-                $rel = "$base/$day";
-                $taken = array_flip(array_values($index));
-                for ($n = 2; isset($taken[$rel]); $n++) $rel = "$base/{$day}_$n";
-                if (!is_dir($this->path($rel)) && !@mkdir($this->path($rel), 0775, true)) {
-                    throw new HttpError(500, 'Kundenordner konnte nicht angelegt werden');
-                }
-                $index[$id] = $rel;
-                $this->writeJson($this->dir . '/.index.json', $index);
-            }
-            unset($body['dirty'], $body['folder'], $body['serverUpdatedAt']);
-            // The server owns the record of uploaded files; the client owns the rest.
-            $data = array_merge($body, [
-                'id' => $id,
-                'files' => $existing['files'] ?? new stdClass(),
-                'createdAt' => $existing['createdAt'] ?? gmdate('c'),
-                'updatedAt' => gmdate('c'),
-                // Deleted stays deleted, even if another device still sends its old copy.
-                'deletedAt' => $existing['deletedAt'] ?? ($body['deletedAt'] ?? null),
-            ]);
-            $this->writeJson($this->path($rel, 'check.json'), $data);
-            return ['ok' => true, 'folder' => $rel, 'updatedAt' => $data['updatedAt'], 'deletedAt' => $data['deletedAt']];
-        });
     }
 
     /** Small JPEG preview (max. 480 px) for another device's list; cached in .tmp/thumbs. */
@@ -408,62 +313,43 @@ final class Store
         return $size;
     }
 
-    public function completeUpload(string $id, string $fileId, string $step, array $body): array
+    /** Move a finished upload into the customer folder and register it in the database. */
+    public function completeUpload(Db $db, string $id, string $fileId, string $step, array $body): array
     {
         $tmpMain = $this->tmpFile($id, $fileId, 'file');
         $tmpPoster = $this->tmpFile($id, $fileId, 'poster');
         clearstatcache();
+        $existing = $db->media($fileId);
+        if ($existing && $existing['path']) return ['ok' => true]; // already done (retry after a lost answer)
         if (!is_file($tmpMain)) throw new HttpError(400, 'Datei fehlt – Upload neu starten');
         $expected = (int)($body['size'] ?? -1);
         if ($expected >= 0 && filesize($tmpMain) !== $expected) {
             @unlink($tmpMain);
             throw new HttpError(400, 'Upload unvollständig – wird neu gestartet');
         }
-
-        return $this->locked(function () use ($id, $fileId, $step, $body, $tmpMain, $tmpPoster) {
-            $c = $this->read($id);
-            if (!$c) throw new HttpError(404, 'Check nicht gefunden – zuerst Daten speichern');
+        return $db->registerUpload($id, $fileId, $step, $body, function (array $row, bool $removed) use ($fileId, $step, $body, $tmpMain, $tmpPoster) {
             $stepDir = (array_search($step, STEP_IDS, true) + 1) . '_' . $step;
-            if (!is_dir($this->path($c['rel'], $stepDir))) @mkdir($this->path($c['rel'], $stepDir), 0775, true);
-
+            if ($removed) $stepDir = '_entfernt'; // removed in the app before the upload finished
+            if (!is_dir($this->path($row['folder'], $stepDir))) @mkdir($this->path($row['folder'], $stepDir), 0775, true);
             // File name: <Kunde>_<Datum>_<Uhrzeit>_<Bezeichnung>_<ID>, readable when copied out of the folder.
-            $customer = (array)($c['data']['customer'] ?? []);
-            $meta0 = is_array($body['meta'] ?? null) ? $body['meta'] : [];
+            $customer = (array)($row['doc']['customer'] ?? []);
+            $meta = is_array($body['meta'] ?? null) ? $body['meta'] : [];
             $when = date_segment($customer);
-            if (!empty($meta0['takenAt']) && ($t = strtotime((string)$meta0['takenAt'])) !== false) {
+            if (!empty($meta['takenAt']) && ($t = strtotime((string)$meta['takenAt'])) !== false) {
                 $when = (new DateTime('@' . $t))->setTimezone(new DateTimeZone('Europe/Berlin'))->format('Y-m-d_H-i');
             }
             $label = safe_segment($customer['name'] ?? '', 'Kunde') . "_{$when}_" . safe_segment($body['label'] ?? '', 'datei');
             $short = substr($fileId, 0, 8);
-            $name = "{$label}_{$short}" . self::ext((string)($body['name'] ?? ''), (string)($body['mime'] ?? ''));
-            if (!rename($tmpMain, $this->path($c['rel'], $stepDir, $name))) throw new HttpError(500, 'Datei konnte nicht abgelegt werden');
-
-            $posterRel = null;
+            $ext = self::ext((string)($body['name'] ?? ''), (string)($body['mime'] ?? ''));
+            $name = "{$label}_{$short}$ext";
+            if (is_file($this->path($row['folder'], $stepDir, $name))) $name = "{$label}_{$fileId}$ext"; // never overwrite
+            if (!rename($tmpMain, $this->path($row['folder'], $stepDir, $name))) throw new HttpError(500, 'Datei konnte nicht abgelegt werden');
+            $poster = null;
             if (is_file($tmpPoster)) {
                 $pname = "{$label}_{$short}_vorschau.jpg";
-                if (rename($tmpPoster, $this->path($c['rel'], $stepDir, $pname))) $posterRel = "$stepDir/$pname";
+                if (rename($tmpPoster, $this->path($row['folder'], $stepDir, $pname))) $poster = "$stepDir/$pname";
             }
-
-            $meta = is_array($body['meta'] ?? null) ? $body['meta'] : [];
-            $num = fn($v) => is_int($v) || is_float($v) ? $v : null;
-            $files = (array)($c['data']['files'] ?? []);
-            $files[$fileId] = [
-                'path' => "$stepDir/$name",
-                'poster' => $posterRel,
-                'mime' => (string)($body['mime'] ?? ''),
-                'size' => filesize($this->path($c['rel'], $stepDir, $name)),
-                'step' => $step,
-                'label' => (string)($body['label'] ?? ''),
-                'takenAt' => isset($meta['takenAt']) ? (string)$meta['takenAt'] : null,
-                'lat' => $num($meta['lat'] ?? null),
-                'lng' => $num($meta['lng'] ?? null),
-                'accuracy' => $num($meta['accuracy'] ?? null),
-                'originalName' => (string)($body['name'] ?? ''),
-                'uploadedAt' => gmdate('c'),
-            ];
-            $c['data']['files'] = $files;
-            $this->writeJson($this->path($c['rel'], 'check.json'), $c['data']);
-            return ['ok' => true, 'path' => "{$c['rel']}/$stepDir/$name"];
+            return ["$stepDir/$name", $poster, filesize($this->path($row['folder'], $stepDir, $name))];
         });
     }
 

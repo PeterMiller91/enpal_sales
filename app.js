@@ -112,7 +112,6 @@
       remarks: '',
       createdAt: now,
       updatedAt: now,
-      dirty: true,
       folder: '',
     };
   }
@@ -228,10 +227,10 @@
     });
   }
 
+  /** Persist the open check on this device (the change itself is already queued as an op). */
   function save({ immediate = false } = {}) {
     if (!check) return;
     check.updatedAt = new Date().toISOString();
-    check.dirty = true;
     clearTimeout(saveTimer);
     const run = () =>
       DB.putCheck(check)
@@ -268,13 +267,215 @@
     return data;
   }
 
-  function putCheck(c) {
-    const { dirty, ...payload } = c;
-    return apiFetch(`checks/${c.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  // ---------------------------------------------------------------- changes as operations
+  //
+  // Every change is queued as a small operation ("set Breite of radiator X", "add photo Y to list Z").
+  // The server applies them in order and returns the resulting state, so edits from several devices
+  // merge instead of overwriting each other, and photos and data stay consistent.
+
+  const DEVICE = (() => {
+    try {
+      let d = localStorage.getItem('device');
+      if (!d) localStorage.setItem('device', (d = uid()));
+      return d;
+    } catch (_) {
+      return uid();
+    }
+  })();
+  const LOCAL_KEYS = ['ui', 'folder', 'rev', 'createdAt', 'updatedAt', 'deletedAt', 'dirty', 'serverUpdatedAt', 'id'];
+  let opSeq = Date.now();
+  let pendingOps = 0;
+  const inFlight = new Set();
+
+  /** "steps.heizkoerper.items.0.room" → ['steps','heizkoerper','items',{id:'…'},'room'] (list items by id, not position). */
+  function opPath(obj, dotted) {
+    const out = [];
+    let cur = obj;
+    for (const seg of dotted.split('.')) {
+      if (Array.isArray(cur) && /^\d+$/.test(seg) && cur[+seg] && typeof cur[+seg] === 'object' && cur[+seg].id) {
+        out.push({ id: cur[+seg].id });
+        cur = cur[+seg];
+      } else {
+        out.push(seg);
+        cur = cur == null ? undefined : cur[seg];
+      }
+    }
+    return out;
+  }
+
+  /** Same rules as the server (lib/db.php): used to replay this device's unsent changes on top of the server state. */
+  function applyOp(doc, op) {
+    const update = (node, path, fn) => {
+      const [seg, ...rest] = path;
+      if (seg && typeof seg === 'object') {
+        if (!Array.isArray(node)) throw new Error('skip');
+        const i = node.findIndex((e) => e && e.id === seg.id);
+        if (i < 0) throw new Error('skip');
+        const copy = node.slice();
+        copy[i] = rest.length ? update(node[i], rest, fn) : fn(node[i]);
+        return copy;
+      }
+      const base = node && typeof node === 'object' && !Array.isArray(node) ? { ...node } : {};
+      if (!rest.length) base[seg] = fn(base[seg]);
+      else base[seg] = update(base[seg] && typeof base[seg] === 'object' ? base[seg] : {}, rest, fn);
+      return base;
+    };
+    try {
+      switch (op.type) {
+        case 'merge':
+          return deepMerge(doc, op.doc || {});
+        case 'set':
+          return update(doc, op.path, () => op.value);
+        case 'addItem':
+          return update(doc, op.path, (l) => (Array.isArray(l) ? (l.some((e) => e && e.id === op.item.id) ? l : [...l, op.item]) : [op.item]));
+        case 'removeItem':
+          return update(doc, op.path, (l) => (Array.isArray(l) ? l.filter((e) => !(e && e.id === op.itemId)) : []));
+        case 'addMedia':
+          return update(doc, op.path, (l) => (Array.isArray(l) ? (l.includes(op.mediaId) ? l : [...l, op.mediaId]) : [op.mediaId]));
+        case 'setMedia':
+          return update(doc, op.path, () => op.mediaId);
+        case 'removeMedia':
+          return update(doc, op.path, (v) => (Array.isArray(v) ? v.filter((x) => x !== op.mediaId) : v === op.mediaId ? null : v));
+        case 'delete':
+          return { ...doc, deletedAt: doc.deletedAt || new Date().toISOString() };
+        default:
+          return doc;
+      }
+    } catch (_) {
+      return doc; // target gone (removed on another device)
+    }
+  }
+
+  function deepMerge(a, b) {
+    if (!a || typeof a !== 'object' || !b || typeof b !== 'object') return b;
+    if (Array.isArray(b)) {
+      const A = Array.isArray(a) ? a : [];
+      if ([...A, ...b].some((e) => e && typeof e === 'object' && e.id)) {
+        const out = A.slice();
+        for (const item of b) {
+          const i = out.findIndex((e) => e && e.id === item.id);
+          if (i >= 0) out[i] = deepMerge(out[i], item);
+          else out.push(item);
+        }
+        return out;
+      }
+      return [...new Set([...A, ...b])];
+    }
+    const out = { ...a };
+    for (const [k, v] of Object.entries(b)) out[k] = k in out ? deepMerge(out[k], v) : v;
+    return out;
+  }
+
+  function docOf(c) {
+    const d = { ...c };
+    for (const k of LOCAL_KEYS) delete d[k];
+    return d;
+  }
+
+  /** Queue a change. Repeated typing in the same field is merged into one change. */
+  async function queueOp(checkId, op) {
+    if (op.type === 'set') {
+      const key = JSON.stringify(op.path);
+      const last = (await DB.opsForCheck(checkId)).filter((o) => !inFlight.has(o.opId)).pop();
+      if (last && last.type === 'set' && JSON.stringify(last.path) === key) {
+        last.value = op.value;
+        await DB.putOp(last);
+        scheduleSync(1500);
+        return;
+      }
+    }
+    await DB.putOp({ ...op, opId: uid(), checkId, seq: ++opSeq });
+    pendingOps++;
+    scheduleSync(op.type === 'set' ? 1500 : 300);
+  }
+
+  /** Change a value in the open check and queue it. `path` is the dotted form used by the form fields. */
+  function setValue(path, value) {
+    if (path.startsWith('ui.')) return setPath(check, path, value);
+    const p = opPath(check, path);
+    setPath(check, path, value);
+    queueOp(check.id, { type: 'set', path: p, value });
+  }
+
+  /** Send queued changes, receive everything new from other devices. Returns ids of checks that changed. */
+  async function pushPull() {
+    const ops = (await DB.allOps()).slice(0, 500);
+    ops.forEach((o) => inFlight.add(o.opId));
+    const since = Number((await DB.getMeta('rev')) || 0);
+    let res;
+    try {
+      res = await apiFetch('sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device: DEVICE, since, ops: ops.map(({ seq, ...o }) => o) }),
+      });
+    } finally {
+      inFlight.clear();
+    }
+    for (const id of [...res.applied, ...res.skipped]) await DB.deleteOp(id);
+    pendingOps = (await DB.allOps()).length;
+
+    const changed = new Set();
+    for (const sc of res.checks) {
+      const local = await DB.getCheck(sc.id);
+      const pending = await DB.opsForCheck(sc.id);
+      if (sc.deletedAt) {
+        const unsent = (await DB.mediaForCheck(sc.id)).some((m) => !m.uploaded);
+        if (!pending.length && !unsent) await purgeLocal(sc.id);
+        else if (local) await DB.putCheck({ ...local, deletedAt: sc.deletedAt });
+        changed.add(sc.id);
+        continue;
+      }
+      let doc = sc.doc;
+      for (const op of pending) doc = applyOp(doc, op);
+      const merged = { ...doc, id: sc.id, folder: sc.folder, rev: sc.rev, createdAt: sc.createdAt, updatedAt: sc.updatedAt, ui: local && local.ui };
+      if (local && JSON.stringify(docOf(local)) === JSON.stringify(docOf(merged)) && local.folder === merged.folder) {
+        await DB.putCheck({ ...local, rev: sc.rev, folder: sc.folder });
+        if (check && check.id === sc.id) check.folder = sc.folder;
+        continue;
+      }
+      await DB.putCheck(merged);
+      changed.add(sc.id);
+      if (check && check.id === sc.id) {
+        for (const k of Object.keys(check)) delete check[k];
+        Object.assign(check, merged);
+      }
+    }
+    for (const m of res.media) {
+      const loc = await DB.getMedia(m.id);
+      if (m.deletedAt) {
+        if (loc && (loc.uploaded || loc.remote)) {
+          await DB.deleteMedia(m.id);
+          if (media.has(m.id)) media.delete(m.id);
+          changed.add(m.checkId);
+        }
+        continue;
+      }
+      if (!m.uploaded || loc) continue;
+      const rec = {
+        id: m.id, checkId: m.checkId, step: m.step, label: m.label || '', mime: m.mime || '', name: m.name || '',
+        kind: (m.mime || '').startsWith('video/') ? 'video' : m.step === 'unterlagen' ? 'doc' : (m.mime || '').startsWith('image/') ? 'photo' : 'doc',
+        blob: null, thumb: null, uploaded: true, remote: true, hasPreview: !!m.hasPreview,
+        meta: { takenAt: m.takenAt || undefined, lat: m.lat ?? undefined, lng: m.lng ?? undefined },
+        createdAt: new Date().toISOString(),
+      };
+      await DB.putMedia(rec);
+      if (check && check.id === m.checkId) cacheMedia(rec);
+      changed.add(m.checkId);
+    }
+    await DB.setMeta('rev', res.rev);
+    return changed;
+  }
+
+  /** One-time switch from the old "whole customer" sync: queue each local customer as one merge. */
+  async function migrateLocal() {
+    if (await DB.getMeta('opsMigrated')) return;
+    for (const c of await DB.allChecks()) {
+      if (c.dirty || !c.folder) await DB.putOp({ type: 'merge', doc: docOf(c), opId: uid(), checkId: c.id, seq: ++opSeq });
+      if (c.deletedAt) await DB.putOp({ type: 'delete', opId: uid(), checkId: c.id, seq: ++opSeq });
+    }
+    await DB.setMeta('opsMigrated', true);
+    pendingOps = (await DB.allOps()).length;
   }
 
   /** Upload one blob in 4 MB pieces (no PHP upload limit, survives weak mobile networks). */
@@ -327,30 +528,12 @@
     }
     syncing = true;
     try {
+      const changed = await pushPull();
+      if (changed.size) onRemoteChange(changed);
       const checks = await DB.allChecks();
-      for (const c0 of checks) {
-        // Use the in-memory version for the open check (it may be newer).
-        const c = check && check.id === c0.id ? check : c0;
-        if (c.deletedAt) {
-          // Deleted here: tell the server (if it knows the customer), then forget it locally.
-          if (c.folder || c.serverUpdatedAt) await putCheck(c);
-          await purgeLocal(c.id);
-          continue;
-        }
-        if (!c.customer.name.trim()) continue;
-        if (c.dirty) {
-          const stamp = c.updatedAt;
-          const res = await putCheck(c);
-          c.folder = res.folder;
-          c.serverUpdatedAt = res.updatedAt;
-          if (c.updatedAt === stamp) c.dirty = false;
-          await DB.putCheck(c);
-          if (res.deletedAt) {
-            await purgeLocal(c.id); // deleted on another device meanwhile
-            continue;
-          }
-        }
-        const pending = (await DB.mediaForCheck(c.id)).filter((m) => !m.uploaded);
+      for (const c of checks) {
+        if (!c.folder || c.deletedAt) continue; // the server creates the customer folder once the name is known
+        const pending = (await DB.mediaForCheck(c.id)).filter((m) => !m.uploaded && m.blob);
         for (let i = 0; i < pending.length; i++) {
           const rec = pending[i];
           try {
@@ -414,7 +597,7 @@
     if (!navigator.onLine) return `Offline · ${n} Datei(en) warten`;
     if (!auth.user) return 'Nicht angemeldet – Upload pausiert';
     if (n) return `${n} Datei(en) warten auf Upload`;
-    if (check.dirty) return 'Wird gespeichert …';
+    if (pendingOps) return 'Wird gespeichert …';
     return 'Alles auf dem Server gesichert';
   }
 
@@ -645,9 +828,13 @@
           if (mode === 'single') {
             const old = getPath(check, path);
             if (old) await removeMedia(old);
+            const p = opPath(check, path);
             setPath(check, path, rec.id);
+            await queueOp(check.id, { type: 'setMedia', path: p, mediaId: rec.id });
           } else {
+            const p = opPath(check, path);
             getPath(check, path).push(rec.id);
+            await queueOp(check.id, { type: 'addMedia', path: p, mediaId: rec.id });
           }
         } catch (e) {
           toast('Datei konnte nicht übernommen werden: ' + e.message, 4000);
@@ -805,10 +992,11 @@
 
   async function viewHome() {
     check = null;
-    // Show this device's list right away, then add customers from other devices.
-    pullFromServer().then((changed) => {
-      if (changed && (location.hash || '#/') === '#/' && !document.querySelector('.swipe.dragging, dialog[open]')) viewHome();
-    });
+    // Show this device's list right away; the sync brings in customers from other devices.
+    if (!viewHome.synced || Date.now() - viewHome.synced > 15000) {
+      viewHome.synced = Date.now();
+      scheduleSync(50);
+    }
     const checks = (await DB.allChecks())
       .filter((c) => !c.deletedAt)
       .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -1090,7 +1278,7 @@
     if (!auth.user) throw new Error('Bitte zuerst anmelden.');
     await save({ immediate: true });
     await sync();
-    if (check.dirty) throw new Error('Daten konnten nicht gespeichert werden. Bitte erneut versuchen.');
+    if (pendingOps) throw new Error('Daten konnten nicht gespeichert werden. Bitte erneut versuchen.');
     if (pendingCount()) {
       if (!confirm(`${pendingCount()} Datei(en) sind noch nicht hochgeladen und fehlen im Bericht. Trotzdem erstellen?`)) throw new Error('abgebrochen');
     }
@@ -1171,10 +1359,9 @@
     const c = await DB.getCheck(id);
     if (!c) return false;
     c.archived = !archived;
-    c.dirty = true;
     c.updatedAt = new Date().toISOString();
     await DB.putCheck(c);
-    scheduleSync();
+    await queueOp(id, { type: 'set', path: ['archived'], value: c.archived });
     toast(archived ? 'Wiederhergestellt' : 'Archiviert');
     return true;
   }
@@ -1196,10 +1383,9 @@
     if (!c) return false;
     // Mark as deleted; the next sync tells the server, so it disappears on all devices.
     c.deletedAt = new Date().toISOString();
-    c.dirty = true;
     await DB.putCheck(c);
     for (const m of media) if (!m.uploaded) await DB.deleteMedia(m.id);
-    scheduleSync(200);
+    await queueOp(id, { type: 'delete' });
     toast('Gelöscht');
     return true;
   }
@@ -1209,72 +1395,36 @@
     await DB.deleteCheck(id);
   }
 
-  // ---------------------------------------------------------------- customers from other devices
+  // ---------------------------------------------------------------- changes from other devices
 
-  let lastPull = 0;
-  let pulling = false;
-
-  /** Store a check from the server on this device, with previews of its uploaded files. */
-  async function importServerCheck(data, local) {
-    const { files = {}, folder, ...rest } = data;
-    const c = { ...rest, folder, ui: (local && local.ui) || rest.ui, dirty: false, serverUpdatedAt: data.updatedAt };
-    await DB.putCheck(c);
-    const have = new Set((await DB.mediaForCheck(c.id)).map((m) => m.id));
-    for (const [fid, f] of Object.entries(files)) {
-      if (have.has(fid)) continue;
-      const mime = f.mime || '';
-      const kind = mime.startsWith('video/') ? 'video' : f.step === 'unterlagen' ? 'doc' : mime.startsWith('image/') ? 'photo' : 'doc';
-      await DB.putMedia({
-        id: fid,
-        checkId: c.id,
-        step: f.step,
-        label: f.label || '',
-        kind,
-        mime,
-        name: f.originalName || (f.path || '').split('/').pop(),
-        blob: null,
-        thumb: null,
-        uploaded: true,
-        remote: true,
-        hasPreview: mime.startsWith('image/') || !!f.poster,
-        meta: { takenAt: f.takenAt || undefined, lat: f.lat ?? undefined, lng: f.lng ?? undefined },
-        createdAt: f.uploadedAt || new Date().toISOString(),
-      });
+  let deferredRender = false;
+  /** Show what other devices changed, without stealing focus from a field being typed in. */
+  function onRemoteChange(ids) {
+    const onHome = (location.hash || '#/') === '#/';
+    if (onHome) {
+      if (!document.querySelector('.swipe.dragging, dialog[open]')) viewHome();
+      return;
     }
+    if (!check || !ids.has(check.id)) return;
+    if (check.deletedAt) {
+      toast('Dieser Kunde wurde auf einem anderen Gerät gelöscht.', 5000);
+      location.hash = '#/';
+      return;
+    }
+    const a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) deferredRender = true;
+    else render();
   }
-
-  /** Fetch the customer list from the server and bring this device up to date. Returns true if anything changed. */
-  async function pullFromServer({ force = false } = {}) {
-    if (pulling || !auth.user || !navigator.onLine) return false;
-    if (!force && Date.now() - lastPull < 20000) return false;
-    pulling = true;
-    let changed = false;
-    try {
-      const list = await apiFetch('checks');
-      lastPull = Date.now();
-      for (const item of list) {
-        const local = await DB.getCheck(item.id);
-        const pending = local ? (await DB.mediaForCheck(item.id)).some((m) => !m.uploaded) : false;
-        if (item.deletedAt) {
-          if (local && !local.dirty && !pending) {
-            await purgeLocal(item.id);
-            changed = true;
-          }
-          continue;
-        }
-        if (local && (local.dirty || local.deletedAt)) continue; // local changes win until they are synced
-        if (local && local.serverUpdatedAt && String(item.updatedAt) <= String(local.serverUpdatedAt)) continue;
-        const data = await apiFetch(`checks/${item.id}`);
-        await importServerCheck(data, local);
-        changed = true;
+  document.addEventListener('focusout', () => {
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (deferredRender && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) {
+        deferredRender = false;
+        render();
       }
-    } catch (e) {
-      if (e.status !== 401) console.warn('Kundenliste vom Server nicht geladen:', e.message);
-    } finally {
-      pulling = false;
-    }
-    return changed;
-  }
+    }, 0);
+  });
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && scheduleSync(100));
 
   let drag = null;
   const SWIPE_THRESHOLD = 0.35; // share of the row width
@@ -1388,7 +1538,7 @@
   $app.addEventListener('input', (e) => {
     const path = e.target.dataset && e.target.dataset.bind;
     if (!path || !check) return;
-    setPath(check, path, e.target.value);
+    setValue(path, e.target.value);
     if (path === 'customer.advisor') {
       try {
         localStorage.setItem('advisor', e.target.value);
@@ -1422,6 +1572,7 @@
       case 'new': {
         const c = newCheck();
         await DB.putCheck(c);
+        await queueOp(c.id, { type: 'merge', doc: docOf(c) });
         location.hash = `#/check/${c.id}/kunde`;
         break;
       }
@@ -1431,6 +1582,7 @@
           document.getElementById('f_customer_name').focus();
           return;
         }
+        if (!check.started) setValue('started', true);
         await save({ immediate: true });
         go(1);
         break;
@@ -1452,28 +1604,37 @@
       case 'remove-media': {
         if (!confirm('Diese Aufnahme entfernen?')) return;
         const { path, file } = btn.dataset;
+        const p = opPath(check, path);
         const val = getPath(check, path);
         if (Array.isArray(val)) val.splice(val.indexOf(file), 1);
         else setPath(check, path, null);
         await removeMedia(file);
+        await queueOp(check.id, { type: 'removeMedia', path: p, mediaId: file });
         await save({ immediate: true });
         render();
         break;
       }
-      case 'add-hk':
-        check.steps.heizkoerper.items.push(newHK());
+      case 'add-hk': {
+        const item = newHK();
+        check.steps.heizkoerper.items.push(item);
+        await queueOp(check.id, { type: 'addItem', path: ['steps', 'heizkoerper', 'items'], item });
         await save({ immediate: true });
         render();
         break;
-      case 'add-eng':
-        check.steps.weg.items.push({ id: uid(), label: '', widthCm: '', photos: [] });
+      }
+      case 'add-eng': {
+        const item = { id: uid(), label: '', widthCm: '', photos: [] };
+        check.steps.weg.items.push(item);
+        await queueOp(check.id, { type: 'addItem', path: ['steps', 'weg', 'items'], item });
         await save({ immediate: true });
         render();
         break;
+      }
       case 'remove-item': {
         if (!confirm('Eintrag inkl. Fotos entfernen?')) return;
         const list = getPath(check, btn.dataset.path);
         const [item] = list.splice(Number(btn.dataset.index), 1);
+        await queueOp(check.id, { type: 'removeItem', path: opPath(check, btn.dataset.path), itemId: item.id });
         const ids = JSON.stringify(item).match(/[a-f0-9]{24}/g) || [];
         for (const id of ids) if (media.has(id)) await removeMedia(id);
         await save({ immediate: true });
@@ -1527,8 +1688,11 @@
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
-  loadConfig().then(() => {
-    render();
-    scheduleSync(500);
-  });
+  Promise.all([loadConfig(), migrateLocal().catch(() => {})])
+    .then(() => DB.allOps())
+    .then((ops) => {
+      pendingOps = ops.length;
+      render();
+      scheduleSync(500);
+    });
 })();

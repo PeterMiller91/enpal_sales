@@ -84,6 +84,31 @@ Sonst greift die Sperre per `.htaccess` für Fotos nicht.
 Einen anderen Ort stellt man in `config.php` mit `data_dir` ein. Liegt er außerhalb des für PHP erlaubten Bereichs,
 nimmt die App automatisch `daten/kunden`. Ist der Ordner nicht nutzbar, zeigt die App nach dem Login den genauen Grund an.
 
+## Datenbank & Synchronisation
+
+Alle Kundendaten und Fotos stehen in einer **SQLite-Datenbank** (`daten/kunden/.db/baubarkeit.sqlite`, eine Datei, keine
+Einrichtung in Plesk nötig – PHP-Erweiterung `pdo_sqlite` muss aktiv sein, bei Netcup Standard).
+
+| Tabelle | Inhalt |
+|---|---|
+| `checks` | ein Eintrag pro Kunde: Kundenordner, alle Eingaben (JSON), Stand (`rev`), gelöscht am |
+| `media` | ein Eintrag pro Foto/Video/Dokument: Kunde, Schritt, Datei im Ordner, Aufnahmezeit, GPS, entfernt am |
+| `ops` | Protokoll jeder einzelnen Änderung: wer, welches Gerät, was, wann |
+
+**Wie synchronisiert wird:** Die Geräte schicken keine kompletten Kunden mehr, sondern einzelne Änderungen
+(„Breite von Heizkörper 2 = 120“, „Foto X zu Hausseite Ost hinzufügen“). Der Server wendet sie der Reihe nach an
+und gibt jedem Gerät alles zurück, was sich seit seinem letzten Abgleich geändert hat. Dadurch
+
+- überschreiben sich Änderungen von Handy und PC nicht gegenseitig, sondern werden zusammengeführt,
+- bleiben Fotos und Daten auf demselben Stand: Ein Foto ist erst „da“, wenn die Datei auf dem Server liegt,
+- wird ein in der App entferntes Foto im Kundenordner nach `_entfernt/` verschoben – der FTP-Ordner zeigt immer den aktuellen Stand,
+- wird `check.json` im Kundenordner nach jeder Änderung neu geschrieben.
+
+Ohne Netz sammelt das Gerät die Änderungen und schickt sie, sobald wieder Verbindung besteht.
+Beim ersten Aufruf nach dem Update werden vorhandene Kundenordner (`check.json`) automatisch in die Datenbank übernommen.
+
+**Sicherung:** Den Ordner `daten/` per FTP sichern (enthält Datenbank und alle Kundenordner).
+
 ## Updates
 
 Neue Version auf GitHub `main` → in Plesk unter *Git* „Pull Updates“ (bei automatischer Bereitstellung passiert das von selbst).
