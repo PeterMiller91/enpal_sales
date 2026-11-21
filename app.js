@@ -1052,7 +1052,8 @@
           <p class="legend">Wischen: nach rechts → wiederherstellen, nach links ← löschen</p></details>` : ''}
         <section class="card" style="gap:8px"><h2>Für das Kundengespräch</h2>
           <a class="btn" href="wirtschaftlichkeit/">Wirtschaftlichkeitsrechner</a>
-          <a class="btn" href="faq/">FAQ Wärmepumpe (100 Antworten)</a></section>
+          <a class="btn" href="faq/">FAQ Wärmepumpe (100 Antworten)</a>
+          <a class="btn" href="checkliste/">Checkliste Beratungstermin</a></section>
         ${auth.user ? `<p class="sub">Angemeldet als ${esc(auth.user)} · <button class="btn small" data-action="logout">Abmelden</button></p>` : ''}
       </main>
       <footer class="actions"><button class="btn primary big" data-action="new">Neuer Check</button></footer>`;
