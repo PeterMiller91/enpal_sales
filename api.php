@@ -8,6 +8,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib/util.php';
 require __DIR__ . '/lib/report.php';
 require __DIR__ . '/lib/db.php';
+require __DIR__ . '/lib/checkliste.php';
 
 const ID_RE = '/^[A-Za-z0-9_-]{6,64}$/';
 const STEP_IDS = ['heizkoerper', 'zaehler', 'heizraum', 'weg', 'hausseiten', 'unterlagen'];
@@ -74,6 +75,20 @@ if ($parts === ['checks'] && $method === 'GET') {
     json_out($db->listChecks());
 }
 
+// GET kunden: Kundenordner für die Checkliste (ohne gelöschte)
+if ($parts === ['kunden'] && $method === 'GET') {
+    $out = [];
+    foreach ($db->listChecks() as $c) {
+        if (!empty($c['deletedAt'])) continue;
+        $cu = (array)$c['customer'];
+        $out[] = ['id' => $c['id'], 'folder' => $c['folder'], 'archived' => $c['archived'],
+                  'name' => (string)($cu['name'] ?? ''), 'number' => (string)($cu['number'] ?? ''),
+                  'address' => (string)($cu['address'] ?? ''), 'date' => (string)($cu['date'] ?? ''),
+                  'updatedAt' => $c['updatedAt']];
+    }
+    json_out($out);
+}
+
 if (($parts[0] ?? '') !== 'checks' || !isset($parts[1])) throw new HttpError(404, 'Unbekannte Route');
 $id = $parts[1];
 if (!preg_match(ID_RE, $id)) throw new HttpError(400, 'Ungültige ID');
@@ -95,6 +110,27 @@ if (count($parts) === 2) {
         $db->sync($user, 'legacy', $ops, PHP_INT_MAX);
         $row = $db->getCheck($id);
         json_out(['ok' => true, 'folder' => $row['folder'], 'updatedAt' => $row['updated_at'], 'deletedAt' => $row['deleted_at']]);
+    }
+}
+
+// POST checks/{id}/checkliste: Checkliste als PDF (+ JSON) im Kundenordner ablegen; GET …/checkliste.pdf lädt sie
+if (count($parts) === 3 && in_array($parts[2], ['checkliste', 'checkliste.pdf'], true)) {
+    $row = $db->getCheck($id);
+    if (!$row || $row['folder'] === null || $row['deleted_at']) throw new HttpError(404, 'Kunde nicht gefunden');
+    $fileName = 'Checkliste_' . safe_segment(str_replace('/', '_', $row['folder']), 'Kunde') . '.pdf';
+    $dest = $store->path($row['folder'], $fileName);
+    if ($parts[2] === 'checkliste.pdf' && $method === 'GET') {
+        if (!is_file($dest)) throw new HttpError(404, 'Noch keine Checkliste gespeichert');
+        send_file($dest, 'application/pdf', $fileName);
+    }
+    if ($parts[2] === 'checkliste' && $method === 'POST') {
+        $body = json_body();
+        $dir = dirname($dest);
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true)) throw new HttpError(500, 'Kundenordner nicht beschreibbar');
+        build_checkliste($body, $row['folder'], $dest);
+        $json = $body + ['savedAt' => gmdate('c'), 'savedBy' => $user];
+        @file_put_contents($store->path($row['folder'], 'checkliste.json'), json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        json_out(['ok' => true, 'folder' => $row['folder'], 'file' => $fileName]);
     }
 }
 
