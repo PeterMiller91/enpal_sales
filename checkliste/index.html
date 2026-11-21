@@ -71,6 +71,23 @@ tr.checked td.task { color: var(--muted); text-decoration: line-through; }
 .top textarea { min-height: 64px; font-size: 14px; }
 .hint { font-size: 14px; margin: 0 0 8px; }
 .foot { font-size: 12px; color: var(--muted); margin-top: 12px; }
+dialog { border: 0; border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: 0 16px 48px rgba(0,0,0,.25); color: var(--text); }
+dialog::backdrop { background: rgba(10, 20, 30, .45); }
+.dlg { display: flex; flex-direction: column; gap: 12px; padding: 18px; max-height: calc(100vh - 40px); }
+.dlg h2 { font-size: 18px; }
+.kunden { overflow: auto; max-height: 46vh; border: 1px solid var(--line); border-radius: 10px; }
+.kunden label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.kunden label:last-child { border-bottom: 0; }
+.kunden label:has(input:checked) { background: var(--accent-soft); }
+.kunden input { margin-top: 3px; accent-color: var(--accent); width: 18px; height: 18px; }
+.kunden .t { font-weight: 600; }
+.kunden .s { font-size: 12px; color: var(--muted); }
+.kunden .tag { font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 0 5px; margin-left: 6px; }
+.msg { font-size: 14px; border-radius: 8px; padding: 10px 12px; }
+.msg.err { background: #FDEBDD; color: #8A3A06; }
+.msg.ok { background: #E3F3EA; color: #1F5C3B; }
+.msg a { color: inherit; font-weight: 700; }
+.dlg .row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .print-only { display: none; }
 
 @media (max-width: 680px) {
@@ -95,7 +112,7 @@ tr.checked td.task { color: var(--muted); text-decoration: line-through; }
 @media print {
   html, body { background: #fff; }
   body { font-size: 9.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .no-print, header.bar, .intro, .tabs { display: none !important; }
+  .no-print, header.bar, .intro, .tabs, dialog { display: none !important; }
   .print-only { display: block; }
   .wrap { max-width: none; padding: 0; }
   .page { display: block !important; border: 0; border-radius: 0; padding: 0; margin: 0; }
@@ -147,6 +164,7 @@ tr.checked td.task { color: var(--muted); text-decoration: line-through; }
     <div class="toolbar no-print">
       <button type="button" class="btn primary" id="printAll">Beide Seiten drucken</button>
       <button type="button" class="btn" id="printKunde">Nur Kundenseite drucken</button>
+      <button type="button" class="btn" id="saveFolder">Im Kundenordner speichern</button>
       <a class="btn" href="Checklisten_Heizungsberatung.pdf" download>Leere Vorlage (PDF)</a>
       <button type="button" class="btn ghost" id="reset">Neu beginnen</button>
     </div>
@@ -188,6 +206,20 @@ tr.checked td.task { color: var(--muted); text-decoration: line-through; }
     <p class="foot">Alle Berechnungen im Termin sind Modellrechnungen auf Basis Ihrer Angaben und keine Garantie für künftige Kosten. Förderbedingungen können sich ändern.</p>
   </section>
 </div>
+
+<dialog id="saveDlg" aria-labelledby="saveTitle">
+  <form method="dialog" class="dlg" id="saveForm">
+    <h2 id="saveTitle">Im Kundenordner speichern</h2>
+    <p class="help" style="margin:0">Die Checkliste wird als PDF (beide Seiten) im Ordner des Kunden aus dem Baubarkeits-Check abgelegt. Erneutes Speichern ersetzt die vorige Fassung.</p>
+    <input type="text" id="kSearch" placeholder="Kunde suchen …" autocomplete="off" aria-label="Kunde suchen">
+    <div class="kunden" id="kList" role="radiogroup" aria-label="Kundenordner"></div>
+    <div class="msg" id="saveMsg" hidden></div>
+    <div class="row">
+      <button type="button" class="btn ghost" id="saveCancel">Schließen</button>
+      <button type="submit" class="btn primary" id="saveGo" value="save">Speichern</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 (() => {
@@ -294,6 +326,97 @@ tr.checked td.task { color: var(--muted); text-decoration: line-through; }
     fields.forEach((el) => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; });
     refresh();
   });
+  /* ---------- Im Kundenordner (Baubarkeits-Check) speichern ---------- */
+  const API = '../api.php?p=';
+  const dlg = document.getElementById('saveDlg');
+  const kList = document.getElementById('kList');
+  const kSearch = document.getElementById('kSearch');
+  const msg = document.getElementById('saveMsg');
+  const goBtn = document.getElementById('saveGo');
+  let kunden = [];
+  const escH = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtD = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('.') : d);
+  function showMsg(kind, html) { msg.className = 'msg ' + kind; msg.innerHTML = html; msg.hidden = false; }
+
+  function renderKunden() {
+    const q = kSearch.value.trim().toLowerCase();
+    const list = kunden.filter((k) => !q || `${k.name} ${k.number} ${k.address}`.toLowerCase().includes(q));
+    kList.innerHTML = list.length ? list.map((k) => `<label>
+        <input type="radio" name="kid" value="${escH(k.id)}" ${state._kundeId === k.id ? 'checked' : ''}>
+        <span><span class="t">${escH(k.name || 'Ohne Namen')}</span>${k.archived ? '<span class="tag">Archiv</span>' : ''}
+        <span class="s" style="display:block">${escH([k.number, k.address, fmtD(k.date)].filter(Boolean).join(' · '))}</span></span>
+      </label>`).join('') : '<p class="help" style="padding:12px;margin:0">Kein passender Kunde. Legen Sie ihn zuerst im Baubarkeits-Check an.</p>';
+  }
+
+  async function openSave() {
+    msg.hidden = true; goBtn.disabled = true; kList.innerHTML = '<p class="help" style="padding:12px;margin:0">Kunden werden geladen …</p>';
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    try {
+      const res = await fetch(API + 'kunden', { credentials: 'same-origin' });
+      if (res.status === 401) {
+        kList.innerHTML = '';
+        showMsg('err', 'Bitte zuerst im <a href="../">Baubarkeits-Check</a> anmelden, dann diese Seite neu laden.');
+        return;
+      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+      kunden = (await res.json()).sort((a, b) => (a.archived - b.archived) || String(b.updatedAt).localeCompare(String(a.updatedAt)));
+      if (!state._kundeId) {
+        const n = document.getElementById('kunde_name').value.trim().toLowerCase();
+        const hit = n && kunden.find((k) => k.name.trim().toLowerCase() === n);
+        if (hit) state._kundeId = hit.id;
+      }
+      kSearch.value = '';
+      renderKunden();
+      goBtn.disabled = false;
+    } catch (e) {
+      kList.innerHTML = '';
+      showMsg('err', 'Kunden konnten nicht geladen werden: ' + escH(e.message || e) + '. Sind Sie online?');
+    }
+  }
+
+  function collect() {
+    const rows = (prefix, list) => { let ph = ''; return list.map(([p, task], i) => {
+      if (p) ph = p;
+      return { phase: p, text: strip(task), mark: task.includes('<mark>'),
+        checked: document.getElementById(`c_${prefix}${i}`).checked, note: document.getElementById(`n_${prefix}${i}`).value };
+    }); };
+    return {
+      kunde: document.getElementById('kunde_name').value, termin: document.getElementById('termin').value,
+      berater: rows('b', B), kunde_liste: rows('k', K),
+      top: [1, 2, 3, 4, 5].map((i) => ({ punkt: document.getElementById(`punkt_${i}`).value,
+        antwort: document.getElementById(`antwort_${i}`).value, geklaert: document.getElementById(`geklaert_${i}`).checked })),
+      notizBerater: document.getElementById('notiz_berater').value, notizKunde: document.getElementById('notiz_kunde').value,
+    };
+  }
+
+  async function doSave(ev) {
+    ev.preventDefault();
+    const sel = kList.querySelector('input[name=kid]:checked');
+    if (!sel) { showMsg('err', 'Bitte einen Kunden auswählen.'); return; }
+    const k = kunden.find((x) => x.id === sel.value);
+    state._kundeId = k.id;
+    const nameEl = document.getElementById('kunde_name'), dateEl = document.getElementById('termin');
+    if (!nameEl.value.trim()) { nameEl.value = k.name; state.kunde_name = k.name; }
+    if (!dateEl.value && /^\d{4}-\d{2}-\d{2}$/.test(k.date)) { dateEl.value = k.date; state.termin = k.date; }
+    save(); refresh();
+    goBtn.disabled = true; goBtn.textContent = 'Speichere …';
+    try {
+      const res = await fetch(API + 'checks/' + encodeURIComponent(k.id) + '/checkliste', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(collect()),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(res.status === 401 ? 'Anmeldung abgelaufen – bitte im Baubarkeits-Check neu anmelden' : out.error || res.statusText);
+      showMsg('ok', `Gespeichert in <b>${escH(out.folder)}</b> als ${escH(out.file)}. <a href="${API}checks/${encodeURIComponent(k.id)}/checkliste.pdf" target="_blank" rel="noopener">PDF öffnen</a>`);
+    } catch (e) {
+      showMsg('err', 'Speichern fehlgeschlagen: ' + escH(e.message || e));
+    } finally { goBtn.disabled = false; goBtn.textContent = 'Speichern'; }
+  }
+
+  document.getElementById('saveFolder').addEventListener('click', openSave);
+  document.getElementById('saveCancel').addEventListener('click', () => dlg.close ? dlg.close() : dlg.removeAttribute('open'));
+  document.getElementById('saveForm').addEventListener('submit', doSave);
+  kSearch.addEventListener('input', renderKunden);
+  kList.addEventListener('change', () => { msg.hidden = true; });
 })();
 </script>
 </body>

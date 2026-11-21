@@ -475,7 +475,7 @@ final class Db
         $out = [];
         foreach ($this->pdo->query('SELECT * FROM checks WHERE folder IS NOT NULL ORDER BY updated_at DESC') as $row) {
             $doc = self::decDoc($row['doc']);
-            $out[] = ['id' => $row['id'], 'folder' => $row['folder'], 'customer' => $doc['customer'] ?? [], 'updatedAt' => $row['updated_at'], 'deletedAt' => $row['deleted_at']];
+            $out[] = ['id' => $row['id'], 'folder' => $row['folder'], 'customer' => $doc['customer'] ?? [], 'archived' => !empty($doc['archived']), 'updatedAt' => $row['updated_at'], 'deletedAt' => $row['deleted_at']];
         }
         return $out;
     }
