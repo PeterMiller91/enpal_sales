@@ -538,7 +538,7 @@ header.bar .links a { color: #fff; }
     const newFixed = v(s.elBase) + v(s.hpMaint);
 
     const invest = Math.max(0, v(s.invest));
-    const rate = Math.min(30 + (klimaActive() ? 16 : 0) + v(s.income), s.income >= 40 ? 80 : 70);
+    const rate = Math.min(30 + (klimaActive() ? 16 : 0) + v(s.income), 80); // KfW 458: zusammen höchstens 80 %
     const subsidy = Math.min(invest, Math.max(0, v(s.cap, 28000))) * rate / 100;
     const own = invest - subsidy;
 
