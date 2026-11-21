@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A2A5C">
+<meta name="robots" content="noindex">
+<title>Checkliste Beratungstermin Wärmepumpe</title>
+<link rel="canonical" href="https://bau.danielschultes.com/checkliste">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<style>
+/* Design der Baubarkeits-Check-App */
+:root {
+  --bg: #F4F6F5; --surface: #fff; --text: #14201D; --muted: #52605C; --line: #D5DDDA;
+  --accent: #0A2A5C; --accent-dark: #061B3D; --accent-soft: #E9EEF7;
+  --yellow: #FFD200; --yellow-hover: #F0C400; --yellow-soft: #FFF6CC; --ok: #1F7A4D;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+button { font: inherit; cursor: pointer; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+header.bar { background: var(--accent); border-bottom: 3px solid var(--yellow); }
+header.bar .wrap { display: flex; justify-content: space-between; align-items: center; min-height: 60px; gap: 12px; padding-top: env(safe-area-inset-top); }
+.kicker { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--yellow); }
+.links { display: flex; gap: 14px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.links a { color: #fff; text-decoration: none; }
+.links a[aria-current="page"] { color: var(--yellow); }
+.intro { padding: 20px 0 8px; }
+h1 { margin: 0 0 6px; font-size: clamp(22px, 4vw, 30px); line-height: 1.15; }
+.lead { margin: 0; color: var(--muted); max-width: 75ch; }
+.meta { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; margin-top: 14px; }
+.f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.f > label { font-size: 12px; font-weight: 600; color: var(--muted); }
+input[type="text"], input[type="date"], textarea {
+  font: inherit; font-size: 16px; color: var(--text); background: #fff; border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px; min-height: 44px; width: 100%;
+}
+textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
+input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.btn { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-size: 14px; font-weight: 600; color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--accent); }
+.btn.primary:hover { background: var(--yellow-hover); }
+.btn.ghost { background: transparent; color: var(--muted); }
+.tabs { display: none; gap: 6px; margin: 12px 0 0; }
+.tabs button { flex: 1; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-weight: 600; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.page { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 16px 0; }
+.page-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h2 { margin: 0; font-size: 20px; color: var(--accent); }
+.progress { font-size: 13px; font-weight: 600; color: var(--muted); }
+.progress.done { color: var(--ok); }
+.page > .lead { margin: 4px 0 12px; font-size: 14px; }
+h3 { margin: 18px 0 8px; font-size: 15px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 8px; }
+td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr.group td { border-top: 2px solid var(--accent); }
+td.phase { width: 120px; font-weight: 700; color: var(--accent); font-size: 13px; }
+td.chk, th.chk { width: 64px; text-align: center; }
+td.note { width: 30%; }
+td.note input { min-height: 36px; padding: 4px 8px; font-size: 14px; }
+mark { background: var(--yellow-soft); color: inherit; padding: 0 2px; }
+input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer; }
+tr.checked td.task { color: var(--muted); text-decoration: line-through; }
+.top td { vertical-align: top; }
+.top td.nr { width: 32px; font-weight: 700; color: var(--accent); padding-top: 16px; }
+.top textarea { min-height: 64px; font-size: 14px; }
+.hint { font-size: 14px; margin: 0 0 8px; }
+.foot { font-size: 12px; color: var(--muted); margin-top: 12px; }
+.print-only { display: none; }
+
+@media (max-width: 680px) {
+  .meta { grid-template-columns: minmax(0, 1fr); }
+  .tabs { display: flex; }
+  .page:not(.active) { display: none; }
+  td.phase, table.list th:first-child { display: none; }
+  header.bar .wrap { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding-top: 8px; padding-bottom: 8px; }
+  tr.group td { border-top: 1px solid var(--line); }
+  tr.group td.task::before { content: attr(data-phase); display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); text-decoration: none; }
+  td.note { width: 34%; }
+  .top, .top tbody, .top tr, .top td { display: block; width: 100%; }
+  .top thead { display: none; }
+  .top tr { border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-bottom: 10px; }
+  .top td { border: 0; padding: 4px; }
+  .top td.nr { padding-top: 4px; }
+  .top td[data-label]::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+}
+
+/* ---------- Druck: Seite 1 Berater, Seite 2 Kunde ---------- */
+@page { size: A4; margin: 14mm 13mm 12mm; }
+@media print {
+  html, body { background: #fff; }
+  body { font-size: 9.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .no-print, header.bar, .intro, .tabs { display: none !important; }
+  .print-only { display: block; }
+  .wrap { max-width: none; padding: 0; }
+  .page { display: block !important; border: 0; border-radius: 0; padding: 0; margin: 0; }
+  .page + .page { break-before: page; page-break-before: always; }
+  body.print-kunde #berater { display: none !important; }
+  body.print-kunde #kunde { break-before: auto; page-break-before: auto; }
+  .print-head { display: flex; justify-content: space-between; align-items: flex-end; background: #0A2A5C; color: #fff; padding: 8pt 10pt; margin-bottom: 8pt; border-bottom: 3pt solid #FFD200; }
+  .print-head strong { font-size: 13pt; }
+  .print-head span { font-size: 9pt; }
+  h2 { font-size: 13pt; }
+  .notes { break-inside: avoid; }
+  h3 { margin: 7pt 0 3pt; font-size: 10.5pt; break-after: avoid; }
+  .page > .lead { font-size: 8.5pt; margin-bottom: 5pt; }
+  .progress { display: none; }
+  table { font-size: 8.5pt; }
+  th { padding: 3pt 4pt; }
+  td { padding: 1.6pt 4pt; }
+  .hint { font-size: 8.5pt; margin-bottom: 4pt; }
+  td.note input { height: 13pt; }
+  tr { break-inside: avoid; }
+  td.phase { width: 70pt; font-size: 8.5pt; }
+  td.chk, th.chk { width: 40pt; }
+  input[type="checkbox"] { width: 10pt; height: 10pt; margin: 0; }
+  tr.checked td.task { text-decoration: none; color: inherit; }
+  td.note input, .top textarea, textarea, input[type="text"] { border: 0; border-bottom: 0.6pt solid #B8B8B8; border-radius: 0; min-height: 0; padding: 1pt 2pt; font-size: 8.5pt; background: transparent; }
+  .top textarea { border: 0.6pt solid #B8B8B8; min-height: 24pt; height: 24pt; resize: none; overflow: hidden; }
+  .notes textarea { border: 0.6pt solid #B8B8B8; resize: none; overflow: hidden;
+    background-image: repeating-linear-gradient(transparent 0 17pt, #D5DDDA 17pt 17.6pt); }
+  #berater .notes textarea { height: 100pt; }
+  #kunde .notes textarea { height: 40pt; }
+  .foot { font-size: 7pt; }
+}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <span class="kicker">Checkliste Beratungstermin</span>
+  <nav class="links" aria-label="Weitere Seiten"><a href="../">Baubarkeits-Check</a><a href="../wirtschaftlichkeit/">Wirtschaftlichkeit</a><a href="../faq/">FAQ</a><a href="./" aria-current="page">Checkliste</a></nav>
+</div></header>
+
+<div class="wrap">
+  <section class="intro">
+    <h1>Checkliste für den Beratungstermin</h1>
+    <p class="lead">Seite 1 ist für den Berater, Seite 2 für den Kunden. Häkchen und Notizen bleiben auf diesem Gerät gespeichert, bis Sie „Neu beginnen“ drücken.</p>
+    <div class="meta">
+      <div class="f"><label for="kunde_name">Kunde</label><input type="text" id="kunde_name" data-save autocomplete="off"></div>
+      <div class="f"><label for="termin">Termin</label><input type="date" id="termin" data-save></div>
+    </div>
+    <div class="toolbar no-print">
+      <button type="button" class="btn primary" id="printAll">Beide Seiten drucken</button>
+      <button type="button" class="btn" id="printKunde">Nur Kundenseite drucken</button>
+      <a class="btn" href="Checklisten_Heizungsberatung.pdf" download>Leere Vorlage (PDF)</a>
+      <button type="button" class="btn ghost" id="reset">Neu beginnen</button>
+    </div>
+    <div class="tabs no-print" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-tab="berater">Berater</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="kunde">Kunde</button>
+    </div>
+  </section>
+
+  <!-- ===================== Seite 1: Berater ===================== -->
+  <section class="page active" id="berater">
+    <div class="print-only print-head"><strong>Heizungsberatung – Checkliste Berater</strong><span class="ph-meta"></span></div>
+    <div class="page-head"><h2>Vor, im und nach dem Termin</h2><span class="progress" data-for="berater"></span></div>
+    <p class="lead">Von oben nach unten abhaken – dann sitzt jede Zahl im Vollkosten-Rechner.</p>
+    <table class="list" data-list="b">
+      <thead><tr><th>Phase</th><th>Aufgabe</th><th class="chk">Erledigt</th><th>Notiz</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="notes"><h3>Notizen zum Termin</h3><textarea id="notiz_berater" data-save aria-label="Notizen zum Termin"></textarea></div>
+  </section>
+
+  <!-- ===================== Seite 2: Kunde ===================== -->
+  <section class="page" id="kunde">
+    <div class="print-only print-head"><strong>Ihre Checkliste für den Beratungstermin</strong><span class="ph-meta"></span></div>
+    <div class="page-head"><h2>Gut vorbereitet in den Termin</h2><span class="progress" data-for="kunde"></span></div>
+    <p class="lead">Mit diesen Unterlagen rechnen wir mit Ihren echten Zahlen statt mit Durchschnittswerten. Was fehlt, schätzen wir gemeinsam.</p>
+    <table class="list" data-list="k">
+      <thead><tr><th>Bereich</th><th>Was wir brauchen</th><th class="chk">Erledigt</th><th>Ihre Angabe</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Ihre wichtigsten Punkte für die Entscheidung</h3>
+    <p class="hint">Was muss geklärt sein, damit Sie sich für eine Wärmepumpe entscheiden? Notieren Sie Ihre <mark>drei bis fünf wichtigsten Fragen oder Bedenken</mark> – wir gehen jeden Punkt im Termin einzeln durch und tragen die Antwort ein.</p>
+    <table class="top">
+      <thead><tr><th>Nr.</th><th>Ihr Punkt / Ihre Frage</th><th>Antwort / Lösung (trägt der Berater ein)</th><th class="chk">Geklärt</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="notes"><h3>Weitere Notizen</h3><textarea id="notiz_kunde" data-save aria-label="Weitere Notizen"></textarea></div>
+    <p class="foot">Alle Berechnungen im Termin sind Modellrechnungen auf Basis Ihrer Angaben und keine Garantie für künftige Kosten. Förderbedingungen können sich ändern.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const B = [
+    ['Tag vorher', 'Förderbedingungen auf kfw.de prüfen: Grundförderung, Klimabonus, Einkommensbonus, Höchstbetrag'],
+    ['', 'CO2-Preis 2027 und aktuelle Gas-, Öl- und Strompreise prüfen, Startwerte im Rechner anpassen'],
+    ['', 'Rechner auf dem Tablet testen: Systemwahl, Rechenweg, Kundenbericht'],
+    ['', 'Kunden-Checkliste (Seite 2) an den Kunden schicken'],
+    ['', 'Angebot für die neue Anlage und ggf. die Alternative liegt vor'],
+    ['Termin: Zahlen', 'Verbrauch der letzten 3 Jahre aus den Abrechnungen, Durchschnitt bilden (Öl: Liter × 10 = kWh)'],
+    ['', 'Alter und Zustand des Kessels: Ersatz in der Laufzeit ansetzen oder 0'],
+    ['', 'Gebäude: Baujahr, Sanierungen, Heizkörper oder Fußbodenheizung – daraus realistische JAZ'],
+    ['', '<mark>Heizlastberechnung vorhanden? Wenn nein: JAZ vorsichtig ansetzen (Altbau 2,8–3,2)</mark>'],
+    ['', 'Selbstnutzer und Einkommen klären – Förderquote im Rechner richtig setzen'],
+    ['Termin: Rechnen', '<mark>Gegen die echte Alternative rechnen (neuer Kessel), nicht gegen „nichts tun“</mark>'],
+    ['', 'Schlechtes Szenario mitrechnen: JAZ 2,8 und CO2-Preis 65 €/t'],
+    ['', 'Kunde liest das Ergebnis selbst ab – dann schweigen'],
+    ['', 'Top-Punkte des Kunden (Seite 2) einzeln durchgehen und Antwort eintragen'],
+    ['Nach dem Termin', 'Kundenbericht drucken oder als PDF speichern und dem Kunden geben'],
+    ['', 'Ablauf des Förderantrags besprechen (Antrag vor Vorhabenbeginn, Regeln auf kfw.de)'],
+    ['', 'Offene Punkte mit Zuständigkeit und Datum festhalten'],
+    ['', 'Folgetermin vereinbaren'],
+  ];
+  const K = [
+    ['Unterlagen', 'Heizkostenabrechnungen der letzten 3 Jahre (Gas in kWh, Öl als Liter oder Lieferscheine)'],
+    ['', 'Letzte Stromrechnung'],
+    ['', 'Schornsteinfeger-Protokoll oder Foto vom Typenschild der Heizung'],
+    ['', 'Vorhandene Angebote für eine neue Heizung, Grundriss falls vorhanden'],
+    ['Haus', 'Baujahr und Wohnfläche (m²)'],
+    ['', 'Bisherige Sanierungen mit Jahr (Fenster, Dach, Dämmung)'],
+    ['', 'Heizkörper, Fußbodenheizung oder beides? Fotos vom Heizungsraum'],
+    ['Förderung', 'Wohnen Sie selbst im Haus?', 'Ja / Nein'],
+    ['', 'Letzter Steuerbescheid, falls ein einkommensabhängiger Bonus infrage kommt'],
+    ['Vorher überlegen', 'Wie lange möchten Sie voraussichtlich noch im Haus wohnen?'],
+    ['', 'Was ist Ihnen wichtiger: niedrige Anschaffung oder niedrige laufende Kosten?'],
+    ['', 'Welches Budget ist realistisch, kommt eine Finanzierung infrage?'],
+  ];
+  const KEY = 'checkliste-beratung-v1';
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* Speicher nicht verfügbar */ } };
+  const strip = (h) => h.replace(/<[^>]+>/g, '');
+
+  function buildList(prefix, rows) {
+    const tb = document.querySelector(`table[data-list="${prefix}"] tbody`);
+    let phase = '';
+    tb.innerHTML = rows.map(([ph, task, ph2], i) => {
+      if (ph) phase = ph;
+      const id = `${prefix}${i}`;
+      return `<tr class="${ph ? 'group' : ''}" data-row="${id}">
+        <td class="phase">${ph}</td>
+        <td class="task" data-phase="${ph}"><label for="c_${id}">${task}</label></td>
+        <td class="chk"><input type="checkbox" id="c_${id}" data-save aria-label="${strip(task)}"></td>
+        <td class="note"><input type="text" id="n_${id}" data-save placeholder="${ph2 || ''}" aria-label="Notiz: ${strip(task)}"></td>
+      </tr>`;
+    }).join('');
+  }
+  buildList('b', B);
+  buildList('k', K);
+  document.querySelector('table.top tbody').innerHTML = [1, 2, 3, 4, 5].map((i) => `<tr>
+      <td class="nr">${i}</td>
+      <td data-label="Ihr Punkt / Ihre Frage"><textarea id="punkt_${i}" data-save rows="2" aria-label="Punkt ${i}"></textarea></td>
+      <td data-label="Antwort / Lösung"><textarea id="antwort_${i}" data-save rows="2" aria-label="Antwort zu Punkt ${i}"></textarea></td>
+      <td class="chk"><input type="checkbox" id="geklaert_${i}" data-save aria-label="Punkt ${i} geklärt"></td>
+    </tr>`).join('');
+
+  const fields = [...document.querySelectorAll('[data-save]')];
+  function refresh() {
+    document.querySelectorAll('tr[data-row]').forEach((tr) => {
+      tr.classList.toggle('checked', tr.querySelector('input[type=checkbox]').checked);
+    });
+    for (const sec of ['berater', 'kunde']) {
+      const boxes = [...document.querySelectorAll(`#${sec} input[type=checkbox]`)];
+      const done = boxes.filter((b) => b.checked).length;
+      const el = document.querySelector(`.progress[data-for="${sec}"]`);
+      el.textContent = `${done} von ${boxes.length} erledigt`;
+      el.classList.toggle('done', done === boxes.length);
+    }
+    const name = document.getElementById('kunde_name').value.trim();
+    const d = document.getElementById('termin').value;
+    const dd = d ? d.split('-').reverse().join('.') : '';
+    document.querySelectorAll('.ph-meta').forEach((s) => {
+      s.textContent = `Kunde: ${name || '______________________'}   ·   Termin: ${dd || '___________'}`;
+    });
+  }
+  fields.forEach((el) => {
+    if (el.id in state) { if (el.type === 'checkbox') el.checked = !!state[el.id]; else el.value = state[el.id]; }
+    el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', () => {
+      state[el.id] = el.type === 'checkbox' ? el.checked : el.value; save(); refresh();
+    });
+  });
+  refresh();
+
+  document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    document.querySelectorAll('.page').forEach((p) => p.classList.toggle('active', p.id === b.dataset.tab));
+  }));
+  document.getElementById('printAll').addEventListener('click', () => { document.body.classList.remove('print-kunde'); window.print(); });
+  document.getElementById('printKunde').addEventListener('click', () => { document.body.classList.add('print-kunde'); window.print(); });
+  window.addEventListener('afterprint', () => document.body.classList.remove('print-kunde'));
+  document.getElementById('reset').addEventListener('click', () => {
+    if (!confirm('Alle Häkchen und Notizen dieser Checkliste löschen?')) return;
+    state = {}; save();
+    fields.forEach((el) => { if (el.type === 'checkbox') el.checked = false; else el.value = ''; });
+    refresh();
+  });
+})();
+</script>
+</body>
+</html>
