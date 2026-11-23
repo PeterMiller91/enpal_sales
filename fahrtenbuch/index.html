@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A2A5C">
+<meta name="robots" content="noindex">
+<title>Fahrtenbuch</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #F4F6F5; --surface: #fff; --text: #14201D; --muted: #52605C; --line: #D5DDDA;
+  --accent: #0A2A5C; --accent-soft: #E9EEF7; --yellow: #FFD200; --yellow-hover: #F0C400; --yellow-soft: #FFF6CC;
+  --warn-soft: #FDEBDD; --warn-ink: #8A3A06; --ok: #15803D; --ok-soft: #DCFCE7;
+  --c-business: #0A2A5C; --c-private: #9AA8A4; --c-commute: #3E63A8;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { font: 15px/1.45 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+button { font: inherit; cursor: pointer; }
+#app { max-width: 720px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+header.bar { position: sticky; top: 0; z-index: 5; background: var(--accent); color: #fff; border-bottom: 3px solid var(--yellow); padding: calc(10px + env(safe-area-inset-top)) 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.bar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; }
+.kicker { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--yellow); }
+h1 { margin: 0; font-size: 21px; }
+h2 { margin: 0; font-size: 15px; }
+.bar .sub { color: #C9D6EE; font-size: 13px; margin: 0; }
+.icon-btn { width: 44px; height: 44px; margin-left: -10px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: none; color: #fff; border-radius: 8px; }
+.top-links { display: flex; gap: 4px; }
+.top-links button { border: 0; background: none; color: #fff; font-size: 13px; font-weight: 600; padding: 8px; border-radius: 8px; min-height: 40px; }
+main { flex: 1; padding: 14px 16px 28px; display: flex; flex-direction: column; gap: 12px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.card.running { border: 2px solid var(--yellow); background: var(--yellow-soft); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label, .lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.req::after { content: " *"; color: var(--warn-ink); }
+input, textarea, select { font: inherit; font-size: 16px; color: var(--text); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; min-height: 44px; width: 100%; min-width: 0; }
+textarea { padding: 10px 12px; min-height: 64px; resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+input[readonly] { background: var(--bg); }
+.help { font-size: 12px; color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--text); font-size: 14px; font-weight: 600; text-decoration: none; }
+.btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--accent); }
+.btn.primary:hover { background: var(--yellow-hover); }
+.btn.blue { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.big { min-height: 56px; font-size: 16px; }
+.btn.small { min-height: 36px; font-size: 13px; padding: 0 10px; }
+.btn.danger { color: #9F1D1D; }
+.btn:disabled { opacity: .5; cursor: default; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions .btn { flex: 1; }
+.seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.seg button { min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 13px; font-weight: 600; color: var(--muted); padding: 0 4px; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hint { display: flex; gap: 8px; align-items: flex-start; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.hint.info { background: var(--accent-soft); color: var(--accent); }
+.hint.warn { background: var(--warn-soft); color: var(--warn-ink); }
+.hint.ok { background: var(--ok-soft); color: #14532D; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.stat { border-radius: 10px; padding: 10px; background: var(--bg); }
+.stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--muted); }
+.stat.total { background: var(--accent); color: #fff; }
+.stat.total span { color: #C9D6EE; }
+@media (max-width: 420px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bar-split { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.list { display: flex; flex-direction: column; }
+.day { font-size: 12px; font-weight: 700; color: var(--muted); padding: 10px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+.trip { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #EEF1F0; color: inherit; text-decoration: none; background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; width: 100%; }
+.trip:last-child { border-bottom: 0; }
+.trip .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.trip .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.trip > * { min-width: 0; }
+.trip .t1 { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trip .t2 { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trip .km { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trip.cancelled .t1, .trip.cancelled .km { text-decoration: line-through; color: var(--muted); }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); }
+.tag.warn { background: var(--warn-soft); color: var(--warn-ink); }
+.big-num { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-weight: 600; }
+.hist { border-left: 3px solid var(--line); padding-left: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; }
+.hist.cancel { border-color: #9F1D1D; }
+.hist.correct { border-color: var(--yellow); }
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; max-width: calc(100% - 32px); z-index: 20; }
+dialog.sheet { border: 0; border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); margin: auto auto 0; width: 100%; max-width: 640px; }
+dialog.sheet::backdrop { background: rgba(20, 32, 29, .45); }
+dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" role="status" hidden></div>
+<script>
+(function () {
+  'use strict';
+  const $app = document.getElementById('app');
+  const TYPES = { business: 'Dienstlich', private: 'Privat', commute: 'Wohnung–Arbeit' };
+  const COLORS = { business: 'var(--c-business)', private: 'var(--c-private)', commute: 'var(--c-commute)' };
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const nf = new Intl.NumberFormat('de-DE');
+  const pad = (n) => String(n).padStart(2, '0');
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const nowTime = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const fmtDate = (iso) => { const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : iso; };
+  const fmtTs = (iso) => (iso ? new Date(iso).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
+  const uid = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const intVal = (s) => { const n = parseInt(String(s).replace(/\D/g, ''), 10); return Number.isFinite(n) ? n : null; };
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('fb-' + k); return v ? JSON.parse(v) : d; } catch (_) { return d; } },
+    set(k, v) { try { v === undefined ? localStorage.removeItem('fb-' + k) : localStorage.setItem('fb-' + k, JSON.stringify(v)); } catch (_) { /* ignore */ } },
+  };
+  function toast(msg, ms = 2800) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), ms);
+  }
+
+  // ---------------------------------------------------------------- server
+  let state = { vehicle: {}, trips: [], verify: null, user: null };
+  let customers = [];
+  async function api(route, opts = {}, query = '') {
+    const r = await fetch(`api.php?p=${route}${query}`, { credentials: 'same-origin', ...opts });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401) { state.user = null; viewLogin(); throw Object.assign(new Error('Bitte anmelden'), { status: 401 }); }
+    if (!r.ok) throw Object.assign(new Error(data.error || `HTTP ${r.status}`), { status: r.status });
+    return data;
+  }
+  const post = (route, body) => api(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+  async function load() {
+    const s = await api('state');
+    state = s;
+    api('customers').then((c) => (customers = c)).catch(() => {});
+  }
+
+  // Offline: new trips wait on the device and are sent later (with the time they were entered).
+  const queue = () => store.get('queue', []);
+  async function flushQueue() {
+    const q = queue();
+    if (!q.length || !navigator.onLine) return;
+    const rest = [];
+    for (const item of q) {
+      try { await post('trips', item); } catch (e) { if (!e.status || e.status >= 500 || e.status === 401) rest.push(item); else toast('Fahrt nicht gespeichert: ' + e.message, 6000); }
+    }
+    store.set('queue', rest);
+    if (rest.length !== q.length) { await load(); render(); }
+  }
+  window.addEventListener('online', flushQueue);
+
+  // ---------------------------------------------------------------- helpers on the logbook
+  const validTrips = () => state.trips.filter((t) => !t.cancelled);
+  function allForChecks() {
+    const pending = queue().map((q) => ({ id: q.id, data: q.trip, cancelled: false, pending: true }));
+    return [...validTrips(), ...pending];
+  }
+  function lastEndKm() {
+    let max = null;
+    for (const t of allForChecks()) if (max === null || t.data.endKm > max) max = t.data.endKm;
+    if (max === null && state.vehicle.startKm != null) max = state.vehicle.startKm;
+    return max;
+  }
+  function lastTrip() {
+    return allForChecks().sort((a, b) => (a.data.endKm || 0) - (b.data.endKm || 0)).pop();
+  }
+  /** Gap/overlap check for a km range; ignoreId = trip being corrected. */
+  function kmCheck(start, end, ignoreId) {
+    const others = allForChecks().filter((t) => t.id !== ignoreId);
+    for (const t of others) {
+      if (start < t.data.endKm && end > t.data.startKm) return { level: 'error', text: `Überschneidet sich mit der Fahrt vom ${fmtDate(t.data.date)} (${nf.format(t.data.startKm)}–${nf.format(t.data.endKm)} km).` };
+    }
+    const before = others.filter((t) => t.data.endKm <= start).sort((a, b) => b.data.endKm - a.data.endKm)[0];
+    const prevEnd = before ? before.data.endKm : state.vehicle.startKm;
+    if (prevEnd != null && start > prevEnd) return { level: 'gap', text: `Lücke: Die vorige Fahrt endete bei ${nf.format(prevEnd)} km, diese beginnt bei ${nf.format(start)} km (${nf.format(start - prevEnd)} km fehlen). Bitte erklären oder die fehlende Fahrt nachtragen.` };
+    return null;
+  }
+  function suggestions() {
+    const partners = new Set(), places = new Set(), purposes = new Set();
+    for (const t of state.trips) { if (t.data.partner) partners.add(t.data.partner); if (t.data.to) places.add(t.data.to); if (t.data.from) places.add(t.data.from); if (t.data.purpose) purposes.add(t.data.purpose); }
+    for (const c of customers) { partners.add(c.name); if (c.address) places.add(c.address); }
+    if (state.vehicle.homeAddress) places.add(state.vehicle.homeAddress);
+    if (state.vehicle.workAddress) places.add(state.vehicle.workAddress);
+    const opt = (s) => [...s].slice(0, 300).map((v) => `<option value="${esc(v)}"></option>`).join('');
+    return `<datalist id="dl-partner">${opt(partners)}</datalist><datalist id="dl-place">${opt(places)}</datalist><datalist id="dl-purpose">${opt(purposes)}</datalist>`;
+  }
+
+  // ---------------------------------------------------------------- GPS recording (while the page is open)
+  let gps = null;
+  const R = 6371;
+  const hav = (a, b) => { const dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lng - a.lng) * Math.PI / 180; const x = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+  async function startGps() {
+    if (!navigator.geolocation) { toast('GPS wird von diesem Browser nicht unterstützt'); return; }
+    stopGps();
+    let wake = null;
+    try { wake = await navigator.wakeLock.request('screen'); } catch (_) { /* optional */ }
+    const id = navigator.geolocation.watchPosition((p) => {
+      const run = store.get('running');
+      if (!run) return stopGps();
+      if (p.coords.accuracy > 60) return; // too imprecise
+      const pt = { lat: p.coords.latitude, lng: p.coords.longitude };
+      if (run.lastPt) {
+        const d = hav(run.lastPt, pt);
+        if (d < 0.015) return; // ignore jitter < 15 m
+        run.gpsKm = (run.gpsKm || 0) + d;
+      } else run.firstPt = pt;
+      run.lastPt = pt;
+      store.set('running', run);
+      const el = document.querySelector('[data-gps-km]');
+      if (el) el.textContent = (run.gpsKm || 0).toFixed(1).replace('.', ',') + ' km';
+    }, (e) => { if (e.code === 1) toast('GPS ist nicht erlaubt – bitte in den Browser-Einstellungen freigeben', 6000); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+    gps = { id, wake };
+  }
+  function stopGps() {
+    if (!gps) return;
+    navigator.geolocation.clearWatch(gps.id);
+    if (gps.wake) gps.wake.release().catch(() => {});
+    gps = null;
+  }
+  document.addEventListener('visibilitychange', () => {
+    const run = store.get('running');
+    if (document.visibilityState === 'visible' && run && run.gps && !gps) startGps();
+  });
+
+  // ---------------------------------------------------------------- addresses → km (OpenStreetMap)
+  async function geocode(q) {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=de&accept-language=de&q=${encodeURIComponent(q)}`);
+    const d = await r.json();
+    if (!d.length) throw new Error(`Adresse nicht gefunden: ${q}`);
+    return { lat: +d[0].lat, lng: +d[0].lon };
+  }
+  async function reverse(pt) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=de&lat=${pt.lat}&lon=${pt.lng}`);
+      const d = await r.json();
+      const a = d.address || {};
+      return [[a.road, a.house_number].filter(Boolean).join(' '), [a.postcode, a.city || a.town || a.village].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    } catch (_) { return ''; }
+  }
+  async function routeKm(from, to) {
+    const a = await geocode(from);
+    await new Promise((r) => setTimeout(r, 1100)); // Nominatim: max. 1 Anfrage pro Sekunde
+    const b = await geocode(to);
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`);
+    const d = await r.json();
+    if (d.code !== 'Ok' || !d.routes.length) throw new Error('Keine Route gefunden');
+    return Math.round(d.routes[0].distance / 100) / 10;
+  }
+
+  // ---------------------------------------------------------------- views
+  let month = (() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; })();
+
+  function header(title, sub, back) {
+    return `<header class="bar"><div class="bar-top">
+      ${back ? `<button class="icon-btn" data-go="#/" aria-label="Zurück"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>` : '<span class="kicker">Fahrtenbuch</span>'}
+      <nav class="top-links">${back ? '' : '<button data-go="#/export">Export</button><button data-go="#/settings">Fahrzeug</button>'}</nav></div>
+      <h1>${esc(title)}</h1>${sub ? `<p class="sub">${sub}</p>` : ''}</header>`;
+  }
+
+  function viewLogin() {
+    $app.innerHTML = `${header('Anmelden', 'Gleiche Zugangsdaten wie im Baubarkeits-Check')}
+      <main><form class="card" id="login">
+        <div class="field"><label for="u">Benutzer</label><input id="u" autocomplete="username" autocapitalize="none" required></div>
+        <div class="field"><label for="pw">Passwort</label><input id="pw" type="password" autocomplete="current-password" required></div>
+        <p class="help" id="lerr" role="alert"></p>
+        <button class="btn primary big" type="submit">Anmelden</button></form></main>`;
+    document.getElementById('login').onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await fetch('../api.php?p=login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user: document.getElementById('u').value, password: document.getElementById('pw').value }) });
+      if (!r.ok) { document.getElementById('lerr').textContent = (await r.json().catch(() => ({}))).error || 'Anmeldung fehlgeschlagen'; return; }
+      await boot();
+    };
+  }
+
+  function viewHome() {
+    const run = store.get('running');
+    const v = state.vehicle;
+    const inMonth = state.trips.filter((t) => t.data.date.startsWith(month));
+    const pend = queue().filter((q) => q.trip.date.startsWith(month));
+    const sum = { business: 0, private: 0, commute: 0 };
+    inMonth.forEach((t) => { if (!t.cancelled) sum[t.data.type] += t.data.endKm - t.data.startKm; });
+    pend.forEach((q) => (sum[q.trip.type] += q.trip.endKm - q.trip.startKm));
+    const total = sum.business + sum.private + sum.commute;
+    const items = [...inMonth.map((t) => ({ ...t, pending: false })), ...pend.map((q) => ({ id: q.id, data: q.trip, pending: true }))]
+      .sort((a, b) => (b.data.date + String(b.data.startKm).padStart(8, '0')).localeCompare(a.data.date + String(a.data.startKm).padStart(8, '0')));
+    let lastDay = '';
+    const list = items.map((t) => {
+      const d = t.data;
+      const day = d.date !== lastDay ? `<div class="day">${fmtDate(d.date)}</div>` : '';
+      lastDay = d.date;
+      const label = d.type === 'business' ? (d.partner || d.to) : d.type === 'commute' ? 'Fahrt Wohnung–Arbeit' : (d.to || 'Privatfahrt');
+      return `${day}<button class="trip ${t.cancelled ? 'cancelled' : ''}" ${t.pending ? '' : `data-go="#/trip/${t.id}"`}>
+        <span class="dot" style="background:${COLORS[d.type]}" aria-hidden="true"></span>
+        <span class="grow"><span class="t1">${esc(label)}</span><span class="t2">${TYPES[d.type]}${d.purpose ? ' · ' + esc(d.purpose) : ''} · ${nf.format(d.startKm)}–${nf.format(d.endKm)}</span></span>
+        ${t.pending ? '<span class="tag warn">wartet</span>' : t.cancelled ? '<span class="tag">storniert</span>' : t.changed ? '<span class="tag">geändert</span>' : ''}
+        <span class="km">${nf.format(d.endKm - d.startKm)} km</span></button>`;
+    }).join('');
+    const [y, m] = month.split('-').map(Number);
+    const monthName = new Date(y, m - 1, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    const setup = !v.plate || v.startKm == null;
+    $app.innerHTML = `${header('Fahrtenbuch', esc([v.plate, v.model].filter(Boolean).join(' · ') || 'Fahrzeug noch nicht eingerichtet'))}
+      <main>
+        ${setup ? `<div class="hint warn">Bitte zuerst Kennzeichen und km-Stand bei Beginn des Fahrtenbuchs eintragen. <button class="btn small" data-go="#/settings">Fahrzeug einrichten</button></div>` : ''}
+        ${run ? `<section class="card running"><div class="row"><h2>Fahrt läuft seit ${esc(run.startTime)} Uhr</h2><span class="tag">${TYPES[run.type]}</span></div>
+            <div class="grid2"><div><div class="lbl">km-Stand Beginn</div><div class="big-num">${nf.format(run.startKm)}</div></div>
+            ${run.gps ? `<div><div class="lbl">GPS-Strecke</div><div class="big-num" data-gps-km>${(run.gpsKm || 0).toFixed(1).replace('.', ',')} km</div></div>` : ''}</div>
+            ${run.gps ? '<p class="help">GPS zeichnet nur auf, solange diese Seite geöffnet ist. Bildschirm bleibt dafür an.</p>' : ''}
+            <div class="actions"><button class="btn" data-act="abort-run">Verwerfen</button><button class="btn primary big" data-go="#/end">Fahrt beenden</button></div></section>`
+          : `<div class="actions"><button class="btn primary big" data-go="#/start" ${setup ? 'disabled' : ''}>Fahrt starten</button><button class="btn big" data-go="#/new" ${setup ? 'disabled' : ''}>Fahrt nachtragen</button></div>`}
+        <section class="card">
+          <div class="row"><button class="btn small" data-act="month" data-d="-1" aria-label="Voriger Monat">‹</button><h2>${monthName}</h2><button class="btn small" data-act="month" data-d="1" aria-label="Nächster Monat">›</button></div>
+          <div class="stats"><div class="stat total"><b>${nf.format(total)}</b><span>km gesamt</span></div>
+            <div class="stat"><b>${nf.format(sum.business)}</b><span>dienstlich</span></div><div class="stat"><b>${nf.format(sum.private)}</b><span>privat</span></div><div class="stat"><b>${nf.format(sum.commute)}</b><span>Wohnung–Arbeit</span></div></div>
+          ${total ? `<div class="bar-split" aria-hidden="true">${['business', 'commute', 'private'].map((k) => `<span style="width:${(sum[k] / total) * 100}%;background:${COLORS[k]}"></span>`).join('')}</div>` : ''}
+          ${items.length ? `<div class="list">${list}</div>` : '<p class="help">Keine Fahrten in diesem Monat.</p>'}
+        </section>
+        ${state.verify ? `<div class="hint ${state.verify.ok ? 'ok' : 'warn'}">${state.verify.ok ? `Prüfkette in Ordnung · ${state.verify.count} Einträge unverändert` : 'Achtung: Die Prüfkette ist beschädigt – Einträge wurden außerhalb der App verändert.'}</div>` : ''}
+        ${queue().length ? `<div class="hint warn">${queue().length} Fahrt(en) warten auf Verbindung und werden automatisch gespeichert.</div>` : ''}
+      </main>`;
+  }
+
+  function viewStart() {
+    const last = lastTrip();
+    const v = state.vehicle;
+    const lastEnd = lastEndKm();
+    $app.innerHTML = `${header('Fahrt starten', '', true)}
+      <main><form class="card" id="f">
+        <div class="field"><span class="lbl">Fahrtart</span><div class="seg" id="type">${Object.entries(TYPES).map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === 'business'}">${l}</button>`).join('')}</div></div>
+        <div class="field"><label for="startKm" class="req">km-Stand bei Abfahrt</label><input id="startKm" inputmode="numeric" value="${lastEnd ?? ''}" required><span class="help">Vorbelegt mit dem Ende der letzten Fahrt. Bitte mit dem Tacho vergleichen.</span></div>
+        <div class="field"><label for="from">Start</label><input id="from" list="dl-place" value="${esc((last && last.data.to) || v.homeAddress || '')}"></div>
+        <label class="row" style="justify-content:flex-start;gap:10px;font-size:14px"><input type="checkbox" id="gps" style="width:22px;min-height:22px" ${store.get('gpsDefault', true) ? 'checked' : ''}> Strecke per GPS aufzeichnen</label>
+        <button class="btn primary big" type="submit">Los geht's</button>
+      </form>${suggestions()}</main>`;
+    let type = 'business';
+    document.getElementById('type').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; type = b.dataset.v; [...b.parentElement.children].forEach((x) => x.setAttribute('aria-pressed', x === b)); };
+    document.getElementById('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const startKm = intVal(document.getElementById('startKm').value);
+      if (startKm == null) return toast('Bitte km-Stand eintragen');
+      const withGps = document.getElementById('gps').checked;
+      store.set('gpsDefault', withGps);
+      store.set('running', { type, startKm, from: document.getElementById('from').value.trim(), date: today(), startTime: nowTime(), gps: withGps, gpsKm: 0 });
+      if (withGps) await startGps();
+      location.hash = '#/';
+    };
+  }
+
+  /** Full trip form: finish a running trip (#/end), add one afterwards (#/new) or correct one (#/correct/id). */
+  async function viewForm(mode, tripId) {
+    const run = store.get('running');
+    const v = state.vehicle;
+    const orig = tripId ? state.trips.find((t) => t.id === tripId) : null;
+    let d;
+    if (mode === 'correct' && orig) d = { ...orig.data };
+    else if (mode === 'end' && run) {
+      d = { type: run.type, date: run.date, startTime: run.startTime, endTime: nowTime(), startKm: run.startKm, endKm: run.gps && run.gpsKm ? run.startKm + Math.round(run.gpsKm) : '', from: run.from, to: '', purpose: '', partner: '', route: '', gapNote: '', source: run.gps ? 'gps' : 'manual', gpsKm: run.gps ? Math.round(run.gpsKm * 10) / 10 : null };
+    } else {
+      const last = lastTrip();
+      d = { type: 'business', date: today(), startTime: '', endTime: '', startKm: lastEndKm() ?? '', endKm: '', from: (last && last.data.to) || v.homeAddress || '', to: '', purpose: '', partner: '', route: '', gapNote: '', source: 'manual' };
+    }
+    const title = mode === 'end' ? 'Fahrt beenden' : mode === 'correct' ? `Fahrt Nr. ${orig.no} korrigieren` : 'Fahrt nachtragen';
+    $app.innerHTML = `${header(title, mode === 'correct' ? 'Die bisherige Fassung bleibt im Änderungsprotokoll erhalten.' : '', true)}
+      <main><form class="card" id="f" novalidate>
+        <div class="field"><span class="lbl">Fahrtart</span><div class="seg" id="type">${Object.entries(TYPES).map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === d.type}">${l}</button>`).join('')}</div></div>
+        <div class="grid3">
+          <div class="field"><label for="date" class="req">Datum</label><input id="date" type="date" value="${esc(d.date)}"></div>
+          <div class="field"><label for="startTime">Abfahrt</label><input id="startTime" type="time" value="${esc(d.startTime)}"></div>
+          <div class="field"><label for="endTime">Ankunft</label><input id="endTime" type="time" value="${esc(d.endTime)}"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label for="startKm" class="req">km-Stand Beginn</label><input id="startKm" inputmode="numeric" value="${d.startKm ?? ''}"></div>
+          <div class="field"><label for="endKm" class="req">km-Stand Ende</label><input id="endKm" inputmode="numeric" value="${d.endKm ?? ''}"></div>
+        </div>
+        <div class="help" id="kmInfo"></div>
+        <div class="field"><label for="from">Start</label><input id="from" list="dl-place" value="${esc(d.from)}"></div>
+        <div class="field"><label for="to" id="toLbl">Reiseziel</label><input id="to" list="dl-place" value="${esc(d.to)}" placeholder="Adresse oder Ort"></div>
+        <div class="row"><button type="button" class="btn small" id="calc">Strecke berechnen</button><span class="help" id="calcOut">${d.routeKm ? `Route: ${String(d.routeKm).replace('.', ',')} km` : d.gpsKm ? `GPS: ${String(d.gpsKm).replace('.', ',')} km` : ''}</span></div>
+        <div data-business>
+          <div class="field"><label for="purpose" class="req">Reisezweck</label><input id="purpose" list="dl-purpose" value="${esc(d.purpose)}" placeholder="z. B. Vor-Ort-Termin Baubarkeit"></div>
+          <div class="field" style="margin-top:12px"><label for="partner">Besuchter Geschäftspartner</label><input id="partner" list="dl-partner" value="${esc(d.partner)}" placeholder="Name des Kunden / der Firma"></div>
+          <div class="field" style="margin-top:12px"><label for="route">Route / Umweg (falls nicht direkt)</label><input id="route" value="${esc(d.route)}"></div>
+        </div>
+        <div class="field" id="gapBox" hidden><label for="gapNote" class="req">Erklärung zur Lücke</label><input id="gapNote" value="${esc(d.gapNote)}" placeholder="z. B. Privatfahrt am Wochenende vergessen"></div>
+        <div id="check"></div>
+        ${mode === 'correct' ? '<div class="field"><label for="reason" class="req">Grund der Korrektur</label><input id="reason" placeholder="z. B. Tippfehler im km-Stand"></div>' : ''}
+        <button class="btn primary big" type="submit">${mode === 'correct' ? 'Korrektur speichern' : 'Fahrt speichern'}</button>
+        <p class="help">Gespeicherte Fahrten lassen sich nicht mehr löschen, nur korrigieren oder stornieren – jeweils mit Grund und Zeitstempel. So erkennt das Finanzamt das Fahrtenbuch an.</p>
+      </form>${suggestions()}</main>`;
+    let type = d.type;
+    const $ = (id) => document.getElementById(id);
+    const sync = () => {
+      document.querySelector('[data-business]').hidden = type !== 'business';
+      $('toLbl').className = type === 'business' ? 'req' : '';
+      const s = intVal($('startKm').value), e = intVal($('endKm').value);
+      $('kmInfo').textContent = s != null && e != null && e >= s ? `${nf.format(e - s)} km gefahren` : '';
+      const c = s != null && e != null ? kmCheck(s, e, tripId) : null;
+      $('gapBox').hidden = !(c && c.level === 'gap');
+      $('check').innerHTML = c ? `<div class="hint warn">${esc(c.text)}</div>` : '';
+    };
+    $('type').onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      type = b.dataset.v; [...b.parentElement.children].forEach((x) => x.setAttribute('aria-pressed', x === b));
+      if (type === 'commute') {
+        if (!$('from').value && v.homeAddress) $('from').value = v.homeAddress;
+        if (!$('to').value && v.workAddress) $('to').value = v.workAddress;
+        if (!$('endKm').value && v.commuteKm && intVal($('startKm').value) != null) $('endKm').value = intVal($('startKm').value) + Math.round(v.commuteKm);
+      }
+      sync();
+    };
+    ['startKm', 'endKm'].forEach((id) => $(id).addEventListener('input', sync));
+    // choosing a customer as partner fills in the destination
+    $('partner').addEventListener('change', () => { const c = customers.find((x) => x.name === $('partner').value); if (c && c.address && !$('to').value) $('to').value = c.address; });
+    sync();
+    // finishing a GPS trip: suggest the destination from the last position
+    if (mode === 'end' && run && run.lastPt && !d.to) {
+      const toEl = $('to');
+      reverse(run.lastPt).then((a) => { if (a && toEl.isConnected && !toEl.value) toEl.value = a; });
+    }
+
+    let routeVal = d.routeKm || null;
+    $('calc').onclick = async () => {
+      const from = $('from').value.trim(), to = $('to').value.trim();
+      if (!from || !to) return toast('Bitte Start und Ziel eintragen');
+      $('calcOut').textContent = 'Wird berechnet …';
+      try {
+        routeVal = await routeKm(from, to);
+        const s = intVal($('startKm').value);
+        $('calcOut').innerHTML = `Route: <b>${String(routeVal).replace('.', ',')} km</b>${s != null ? ` <button type="button" class="btn small" id="useRoute">km-Stand Ende = ${nf.format(s + Math.round(routeVal))}</button>` : ''}`;
+        const u = $('useRoute'); if (u) u.onclick = () => { $('endKm').value = s + Math.round(routeVal); sync(); };
+      } catch (e) { $('calcOut').textContent = e.message; }
+    };
+
+    $('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const trip = {
+        type, date: $('date').value, startTime: $('startTime').value, endTime: $('endTime').value,
+        startKm: intVal($('startKm').value), endKm: intVal($('endKm').value), from: $('from').value.trim(), to: $('to').value.trim(),
+        purpose: type === 'business' ? $('purpose').value.trim() : '', partner: type === 'business' ? $('partner').value.trim() : '',
+        route: type === 'business' ? $('route').value.trim() : '', gapNote: $('gapBox').hidden ? '' : $('gapNote').value.trim(),
+        source: routeVal ? 'route' : d.source || 'manual', gpsKm: d.gpsKm ?? null, routeKm: routeVal,
+      };
+      if (!trip.date || trip.startKm == null || trip.endKm == null) return toast('Datum und beide km-Stände sind Pflicht');
+      if (trip.endKm < trip.startKm) return toast('km-Stand Ende ist kleiner als Beginn');
+      if (type === 'business' && (!trip.to || !trip.purpose)) return toast('Bei Dienstfahrten sind Reiseziel und Reisezweck Pflicht');
+      const c = kmCheck(trip.startKm, trip.endKm, tripId);
+      if (c && c.level === 'error') return toast(c.text, 6000);
+      if (c && c.level === 'gap' && !trip.gapNote) return toast('Bitte die Lücke erklären oder die fehlende Fahrt zuerst nachtragen', 6000);
+      try {
+        if (mode === 'correct') {
+          const reason = $('reason').value.trim();
+          if (!reason) return toast('Bitte den Grund der Korrektur angeben');
+          await post(`trips/${tripId}/correct`, { trip, reason });
+        } else {
+          const item = { id: uid(), trip, clientTime: new Date().toISOString() };
+          try { await post('trips', item); } catch (err) {
+            if (err.status && err.status < 500) throw err;
+            store.set('queue', [...queue(), item]); // offline: later
+            toast('Offline gespeichert – wird übertragen, sobald Netz da ist', 4000);
+          }
+          if (mode === 'end') { stopGps(); store.set('running', undefined); }
+        }
+        await load().catch(() => {});
+        location.hash = '#/';
+        if (navigator.onLine) toast('Gespeichert');
+      } catch (err) { toast(err.message, 5000); }
+    };
+  }
+
+  function viewTrip(id) {
+    const t = state.trips.find((x) => x.id === id);
+    if (!t) { location.hash = '#/'; return; }
+    const d = t.data;
+    const kindText = { create: 'erfasst', correct: 'korrigiert', cancel: 'storniert' };
+    $app.innerHTML = `${header(`Fahrt Nr. ${t.no}`, `${fmtDate(d.date)} · ${TYPES[d.type]}${t.cancelled ? ' · STORNIERT' : ''}`, true)}
+      <main><section class="card"><dl class="kv">
+        <dt>Datum</dt><dd>${fmtDate(d.date)} ${esc([d.startTime, d.endTime].filter(Boolean).join('–'))}</dd>
+        <dt>km-Stand</dt><dd>${nf.format(d.startKm)} – ${nf.format(d.endKm)} (${nf.format(d.endKm - d.startKm)} km)</dd>
+        <dt>Fahrtart</dt><dd>${TYPES[d.type]}</dd>
+        ${d.from ? `<dt>Start</dt><dd>${esc(d.from)}</dd>` : ''}${d.to ? `<dt>Reiseziel</dt><dd>${esc(d.to)}</dd>` : ''}
+        ${d.route ? `<dt>Route</dt><dd>${esc(d.route)}</dd>` : ''}${d.purpose ? `<dt>Reisezweck</dt><dd>${esc(d.purpose)}</dd>` : ''}
+        ${d.partner ? `<dt>Geschäftspartner</dt><dd>${esc(d.partner)}</dd>` : ''}${d.gapNote ? `<dt>Lücke</dt><dd>${esc(d.gapNote)}</dd>` : ''}
+        ${d.gpsKm ? `<dt>GPS-Strecke</dt><dd>${String(d.gpsKm).replace('.', ',')} km</dd>` : ''}${d.routeKm ? `<dt>Routenplaner</dt><dd>${String(d.routeKm).replace('.', ',')} km</dd>` : ''}
+        <dt>Erfasst am</dt><dd>${fmtTs(t.createdAt)}</dd></dl></section>
+        <section class="card"><h2>Änderungsprotokoll</h2>
+          ${t.history.map((h) => `<div class="hist ${h.kind}"><b>Version ${h.version}: ${kindText[h.kind]} am ${fmtTs(h.recordedAt)}</b>${h.reason ? `<span>Grund: ${esc(h.reason)}</span>` : ''}<span class="help">${fmtDate(h.data.date)} · ${nf.format(h.data.startKm)}–${nf.format(h.data.endKm)} km · ${TYPES[h.data.type]}${h.data.to ? ' · ' + esc(h.data.to) : ''}${h.data.purpose ? ' · ' + esc(h.data.purpose) : ''}</span></div>`).join('')}
+        </section>
+        ${t.cancelled ? '' : `<div class="actions"><button class="btn danger" data-act="cancel" data-id="${t.id}">Stornieren</button><button class="btn blue" data-go="#/correct/${t.id}">Korrigieren</button></div>`}
+      </main>`;
+  }
+
+  function viewExport() {
+    const y = new Date().getFullYear();
+    const presets = [[`${y}-01-01`, `${y}-12-31`, `Jahr ${y}`], [`${y - 1}-01-01`, `${y - 1}-12-31`, `Jahr ${y - 1}`], [`${month}-01`, `${month}-31`, 'Angezeigter Monat']];
+    $app.innerHTML = `${header('Export', 'Für Steuerberater und Finanzamt', true)}
+      <main><section class="card">
+        <div class="seg" id="pre">${presets.map(([f, t, l], i) => `<button type="button" data-f="${f}" data-t="${t}" aria-pressed="${i === 0}">${l}</button>`).join('')}</div>
+        <div class="grid2"><div class="field"><label for="from">Von</label><input id="from" type="date" value="${presets[0][0]}"></div><div class="field"><label for="to">Bis</label><input id="to" type="date" value="${presets[0][1]}"></div></div>
+        <div class="actions"><button class="btn primary big" data-act="export" data-fmt="pdf">PDF</button><button class="btn big" data-act="export" data-fmt="csv">CSV (Excel)</button></div>
+        <p class="help">Das PDF enthält alle Fahrten mit Pflichtangaben, die km-Auswertung (dienstlich/privat/Wohnung–Arbeit), stornierte Fahrten durchgestrichen und das vollständige Änderungsprotokoll mit Prüfsumme.</p>
+      </section>
+      ${state.verify ? `<div class="hint ${state.verify.ok ? 'ok' : 'warn'}">Prüfkette ${state.verify.ok ? 'in Ordnung' : 'beschädigt'} · Prüfsumme ${esc(state.verify.last.slice(0, 16))}…</div>` : ''}</main>`;
+    document.getElementById('pre').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; document.getElementById('from').value = b.dataset.f; document.getElementById('to').value = b.dataset.t; [...b.parentElement.children].forEach((x) => x.setAttribute('aria-pressed', x === b)); };
+  }
+
+  function viewSettings() {
+    const v = state.vehicle;
+    const locked = state.trips.length > 0;
+    $app.innerHTML = `${header('Fahrzeug', 'Angaben für den Kopf des Fahrtenbuchs', true)}
+      <main><form class="card" id="f">
+        <div class="grid2"><div class="field"><label for="plate" class="req">Kennzeichen</label><input id="plate" value="${esc(v.plate)}" placeholder="z. B. B-DS 123" autocapitalize="characters"></div>
+        <div class="field"><label for="model">Fahrzeug</label><input id="model" value="${esc(v.model)}" placeholder="Marke / Modell"></div></div>
+        <div class="field"><label for="driver">Fahrer / Halter</label><input id="driver" value="${esc(v.driver)}"></div>
+        <div class="field"><label for="startKm" class="req">km-Stand bei Beginn des Fahrtenbuchs</label><input id="startKm" inputmode="numeric" value="${v.startKm ?? ''}" ${locked ? 'readonly' : ''}>${locked ? '<span class="help">Nach der ersten Fahrt nicht mehr änderbar.</span>' : ''}</div>
+        <div class="field"><label for="homeAddress">Wohnung</label><input id="homeAddress" value="${esc(v.homeAddress)}"></div>
+        <div class="field"><label for="workAddress">Erste Tätigkeitsstätte</label><input id="workAddress" value="${esc(v.workAddress)}"><span class="help">Für Fahrten Wohnung–Arbeit; leer lassen, wenn es keine gibt.</span></div>
+        <div class="field"><label for="commuteKm">Entfernung Wohnung–Arbeit (einfach, km)</label><input id="commuteKm" inputmode="decimal" value="${v.commuteKm ?? ''}"></div>
+        <button class="btn primary big" type="submit">Speichern</button>
+      </form></main>`;
+    document.getElementById('f').onsubmit = async (e) => {
+      e.preventDefault();
+      const g = (id) => document.getElementById(id).value;
+      if (!g('plate').trim() || intVal(g('startKm')) == null) return toast('Kennzeichen und km-Stand sind Pflicht');
+      try {
+        const r = await post('vehicle', { plate: g('plate'), model: g('model'), driver: g('driver'), startKm: g('startKm'), homeAddress: g('homeAddress'), workAddress: g('workAddress'), commuteKm: g('commuteKm') });
+        state.vehicle = r.vehicle; toast('Gespeichert'); location.hash = '#/';
+      } catch (err) { toast(err.message, 5000); }
+    };
+  }
+
+  function askReason(title, okText) {
+    return new Promise((resolve) => {
+      const d = document.createElement('dialog');
+      d.className = 'sheet';
+      d.innerHTML = `<form method="dialog"><h2>${esc(title)}</h2><div class="field"><label for="rs" class="req">Grund</label><input id="rs" required></div>
+        <div class="actions"><button class="btn" value="cancel" formnovalidate>Abbrechen</button><button class="btn primary" value="ok">${esc(okText)}</button></div></form>`;
+      document.body.appendChild(d);
+      d.addEventListener('close', () => { resolve(d.returnValue === 'ok' ? d.querySelector('#rs').value.trim() : null); d.remove(); });
+      d.showModal();
+    });
+  }
+
+  // ---------------------------------------------------------------- routing & events
+  function render() {
+    if (!state.user) return viewLogin();
+    const h = location.hash || '#/';
+    let m;
+    if (h === '#/start') return store.get('running') ? (location.hash = '#/') : viewStart();
+    if (h === '#/end') return store.get('running') ? viewForm('end') : (location.hash = '#/');
+    if (h === '#/new') return viewForm('new');
+    if ((m = h.match(/^#\/correct\/([a-f0-9]+)$/))) return viewForm('correct', m[1]);
+    if ((m = h.match(/^#\/trip\/([a-f0-9]+)$/))) return viewTrip(m[1]);
+    if (h === '#/export') return viewExport();
+    if (h === '#/settings') return viewSettings();
+    viewHome();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', render);
+  $app.addEventListener('click', async (e) => {
+    const go = e.target.closest('[data-go]');
+    if (go && !go.disabled) { location.hash = go.dataset.go; return; }
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const a = b.dataset.act;
+    if (a === 'month') {
+      const [y, m] = month.split('-').map(Number);
+      const d = new Date(y, m - 1 + Number(b.dataset.d), 1);
+      month = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      viewHome();
+    } else if (a === 'abort-run') {
+      if (!confirm('Laufende Fahrt verwerfen? Es wird nichts gespeichert.')) return;
+      stopGps(); store.set('running', undefined); viewHome();
+    } else if (a === 'cancel') {
+      const reason = await askReason('Fahrt stornieren', 'Stornieren');
+      if (!reason) return;
+      try { await post(`trips/${b.dataset.id}/cancel`, { reason }); await load(); toast('Storniert – bleibt im Fahrtenbuch sichtbar'); render(); } catch (err) { toast(err.message, 5000); }
+    } else if (a === 'export') {
+      const f = document.getElementById('from').value, t = document.getElementById('to').value;
+      window.open(`api.php?p=export.${b.dataset.fmt}&from=${f}&to=${t}`, '_blank');
+    }
+  });
+
+  async function boot() {
+    try { await load(); } catch (e) { if (e.status === 401) return; toast('Server nicht erreichbar – laufende Fahrt und Offline-Einträge bleiben auf dem Gerät', 5000); state.user = state.user || 'offline'; }
+    const run = store.get('running');
+    if (run && run.gps) startGps();
+    flushQueue();
+    render();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

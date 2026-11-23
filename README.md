@@ -84,6 +84,19 @@ Sonst greift die Sperre per `.htaccess` für Fotos nicht.
 Einen anderen Ort stellt man in `config.php` mit `data_dir` ein. Liegt er außerhalb des für PHP erlaubten Bereichs,
 nimmt die App automatisch `daten/kunden`. Ist der Ordner nicht nutzbar, zeigt die App nach dem Login den genauen Grund an.
 
+## Fahrtenbuch (`/fahrtenbuch`)
+
+Persönliches digitales Fahrtenbuch, gleiche Anmeldung wie die Bau-App, jeder Benutzer hat sein eigenes.
+Daten in `daten/fahrtenbuch/fahrtenbuch.sqlite` (per `.htaccess` gesperrt, per FTP sicherbar).
+
+- **Erfassung:** Fahrt starten/beenden am Handy (optional mit GPS-Aufzeichnung, solange die Seite offen ist),
+  Fahrt nachtragen, Strecke aus Start- und Zieladresse berechnen (OpenStreetMap: Nominatim + OSRM).
+- **Finanzamt-tauglich:** Pflichtangaben je Fahrt (Datum, km-Stand Beginn/Ende, Ziel, Zweck, Geschäftspartner bei
+  Dienstfahrten), keine Löschung, Korrektur/Storno nur als neue Version mit Grund und Zeitstempel, Lücken- und
+  Überschneidungsprüfung der km-Stände, SHA-256-Prüfkette über alle Einträge (Manipulationen werden angezeigt).
+- **Export:** PDF (A4 quer, mit km-Auswertung und Änderungsprotokoll) und CSV.
+- Ohne Netz gespeicherte Fahrten werden später automatisch übertragen.
+
 ## Datenbank & Synchronisation
 
 Alle Kundendaten und Fotos stehen in einer **SQLite-Datenbank** (`daten/kunden/.db/baubarkeit.sqlite`, eine Datei, keine
