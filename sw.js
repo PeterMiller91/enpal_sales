@@ -1,5 +1,5 @@
 /* Service worker: keeps the app shell available offline. API calls always go to the network. */
-const CACHE = 'bbc-shell-v9';
+const CACHE = 'bbc-shell-v10';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'db.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {

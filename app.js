@@ -1053,7 +1053,8 @@
         <section class="card" style="gap:8px"><h2>Für das Kundengespräch</h2>
           <a class="btn" href="wirtschaftlichkeit/">Wirtschaftlichkeitsrechner</a>
           <a class="btn" href="faq/">FAQ Wärmepumpe (100 Antworten)</a>
-          <a class="btn" href="checkliste/">Checkliste Beratungstermin</a></section>
+          <a class="btn" href="checkliste/">Checkliste Beratungstermin</a>
+          <a class="btn" href="baustelle/">Baustellen-Fotos</a></section>
         <section class="card" style="gap:8px"><h2>Für mich</h2>
           <a class="btn" href="fahrtenbuch/">Fahrtenbuch</a></section>
         ${auth.user ? `<p class="sub">Angemeldet als ${esc(auth.user)} · <button class="btn small" data-action="logout">Abmelden</button></p>` : ''}

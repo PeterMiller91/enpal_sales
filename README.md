@@ -84,6 +84,21 @@ Sonst greift die Sperre per `.htaccess` für Fotos nicht.
 Einen anderen Ort stellt man in `config.php` mit `data_dir` ein. Liegt er außerhalb des für PHP erlaubten Bereichs,
 nimmt die App automatisch `daten/kunden`. Ist der Ordner nicht nutzbar, zeigt die App nach dem Login den genauen Grund an.
 
+## Baustellen-Fotos (`/baustelle`)
+
+Fotos von Baustellen geordnet hochladen, gleiche Anmeldung wie die Bau-App; alle Benutzer sehen alle Baustellen.
+`/Baustelle` leitet hierher weiter.
+
+- Baustelle anlegen (Name, Adresse, Kunde – Vorschläge aus dem Baubarkeits-Check), archivieren.
+- Fotos per Kamera oder aus der Galerie, mehrere auf einmal, mit Kategorie (Vorher, Außengerät & Fundament,
+  Hydraulik & Heizraum, Elektrik & Zählerschrank, Leitungen & Kernbohrung, PV & Dach, Inbetriebnahme,
+  Nachher & Abnahme, Mängel & Schäden, Lieferscheine & Dokumente, Sonstiges) und optionaler Notiz.
+  Aufnahmezeit und GPS werden übernommen, Fotos auf max. 3000 px verkleinert. Ohne Netz warten sie auf dem Gerät.
+- Galerie nach Tag und Kategorie, Filter, Großansicht mit Wischen, Kategorie/Notiz ändern, Entfernen, ZIP-Download.
+- Ablage (per FTP sichtbar, im Web gesperrt):
+  `daten/baustellen/<Baustelle>/<JJJJ-MM-TT>/<NN_Kategorie>/<Baustelle>_<Datum_Uhrzeit>_<Kategorie>_<ID>.jpg`,
+  dazu `baustelle.txt` mit den Angaben; entfernte Fotos liegen in `<Baustelle>/_entfernt/`.
+
 ## Fahrtenbuch (`/fahrtenbuch`)
 
 Persönliches digitales Fahrtenbuch, gleiche Anmeldung wie die Bau-App, jeder Benutzer hat sein eigenes.

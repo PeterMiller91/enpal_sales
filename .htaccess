@@ -9,6 +9,7 @@ Options -Indexes
 RedirectMatch 404 ^/(lib|daten|\.git)(/|$)
 RedirectMatch 301 ^/wirtschaf(t)?lichkeit$ /wirtschaftlichkeit/
 RedirectMatch 301 ^/wirtschaflichkeit/(.*)$ /wirtschaftlichkeit/$1
+RedirectMatch 301 ^/Baustelle(/(.*))?$ /baustelle/$2
 
 # HTTPS erzwingen (Zertifikat z. B. über Let's Encrypt in Plesk)
 <IfModule mod_rewrite.c>
