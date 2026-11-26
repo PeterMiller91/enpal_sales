@@ -67,6 +67,10 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
 
     // one photo per request (multipart: file + meta JSON); the app sends photos already resized
     if ($action === 'upload' && $method === 'POST') {
+        // PHP drops the whole request when it exceeds post_max_size: say so instead of "missing id"
+        if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+            throw new HttpError(413, 'Datei zu groß für den Server (max. ' . ini_get('post_max_size') . 'B). Bitte kleinere Foto-Qualität wählen.');
+        }
         $photoId = (string)($_POST['id'] ?? '');
         if (!preg_match(ID_RE, $photoId)) throw new HttpError(400, 'Ungültige Foto-ID');
         $f = $_FILES['file'] ?? null;

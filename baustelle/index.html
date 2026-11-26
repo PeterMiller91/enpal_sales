@@ -81,6 +81,24 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); bo
 .selbar .btn.ghost { background: transparent; border-color: rgba(255,255,255,.4); color: #fff; }
 @media (max-width: 520px) { .selbar .count { flex-basis: 100%; } .selbar .btn { flex: 1; padding: 0 8px; font-size: 13px; } }
 .ph .doc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent); }
+.qitem { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid #EEF1F0; }
+.qitem:last-child { border-bottom: 0; }
+.qitem .qthumb { width: 56px; height: 56px; border-radius: 8px; background: var(--accent-soft) center/cover no-repeat; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--accent); }
+.qitem .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.qitem .t1 { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qitem .t2 { font-size: 12px; color: var(--muted); }
+.qitem .t2.err { color: #9F1D1D; }
+.qitem .qbtns { display: flex; flex-direction: column; gap: 4px; }
+.bigbar { height: 12px; border-radius: 6px; background: var(--accent-soft); overflow: hidden; }
+.bigbar span, .progress span { transition: width .2s; }
+.bigbar span { display: block; height: 100%; background: var(--yellow); }
+.qlink { color: var(--accent); font-weight: 700; text-decoration: underline; background: none; border: 0; padding: 0; font-size: 12px; }
+.preset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.preset button { min-height: 56px; border: 1px solid var(--line); border-radius: 10px; background: #fff; text-align: left; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; }
+.preset button b { font-size: 14px; }
+.preset button span { font-size: 12px; color: var(--muted); }
+.preset button[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); }
+input[type=range] { padding: 0; min-height: 32px; accent-color: var(--accent); border: 0; }
 .progress { height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; }
 .progress span { display: block; height: 100%; background: var(--yellow); }
 /* Großansicht */
@@ -157,32 +175,62 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     queueItems = await qAll();
     for (const it of queueItems) if (!previewUrls.has(it.id) && it.blob.type.startsWith('image/')) previewUrls.set(it.id, URL.createObjectURL(it.blob));
   }
-  async function processQueue() {
+  const live = new Map(); // id -> { loaded, total } for the item being uploaded
+  let doneBytes = 0, doneCount = 0; // this session
+  const paused = () => ls.get('paused', false);
+
+  function upload(it) {
+    return new Promise((resolve, reject) => {
+      const fd = new FormData();
+      fd.append('id', it.id);
+      fd.append('meta', JSON.stringify(it.meta));
+      fd.append('file', it.blob, it.name);
+      const x = new XMLHttpRequest();
+      x.open('POST', `api.php?p=sites/${it.siteId}/upload`);
+      x.upload.onprogress = (e) => { if (e.lengthComputable) { live.set(it.id, { loaded: e.loaded, total: e.total }); renderQueueProgress(); } };
+      x.onload = () => {
+        let data = {};
+        try { data = JSON.parse(x.responseText); } catch (_) { /* ignore */ }
+        if (x.status === 401) { state.user = null; viewLogin(); }
+        if (x.status >= 200 && x.status < 300) resolve(data);
+        else reject(Object.assign(new Error(data.error || (x.status === 413 ? 'Datei zu groß für den Server' : `HTTP ${x.status}`)), { status: x.status }));
+      };
+      x.onerror = () => reject(new Error('Netzwerkfehler'));
+      x.send(fd);
+    });
+  }
+
+  async function processQueue(force = false) {
     if (uploading || !navigator.onLine || !state.user || state.user === 'offline') return;
+    if (paused() && !force) { progress = 'Upload pausiert'; renderUploadStatus(); return; }
     uploading = true;
     try {
       await refreshQueue();
-      const total = queueItems.length;
-      let i = 0;
-      for (const it of queueItems.sort((a, b) => a.added - b.added)) {
-        i++;
-        progress = `Lädt hoch ${i}/${total} …`;
+      // items that failed for good (e.g. too large) wait for the user: retry or remove in the queue view
+      const todo = queueItems.filter((it) => !it.error || force).sort((a, b) => a.added - b.added);
+      for (let i = 0; i < todo.length; i++) {
+        if (paused() && !force) break;
+        const it = todo[i];
+        progress = `Lädt hoch ${i + 1}/${todo.length} …`;
         renderUploadStatus();
-        const fd = new FormData();
-        fd.append('id', it.id);
-        fd.append('meta', JSON.stringify(it.meta));
-        fd.append('file', it.blob, it.name);
+        live.set(it.id, { loaded: 0, total: it.blob.size });
+        renderQueueProgress();
         try {
-          await api(`sites/${it.siteId}/upload`, { method: 'POST', body: fd });
+          await upload(it);
           await qDel(it.id);
+          doneBytes += it.blob.size; doneCount++;
           const u = previewUrls.get(it.id); if (u) { URL.revokeObjectURL(u); previewUrls.delete(it.id); }
         } catch (e) {
-          if (!e.status || e.status >= 500 || e.status === 401) throw e; // retry later
-          await qDel(it.id); // rejected (e.g. wrong file type): drop
-          toast(`„${it.name}“ nicht hochgeladen: ${e.message}`, 6000);
+          if (!e.status || e.status >= 500 || e.status === 401) throw e; // network/server: retry later
+          it.error = e.message; // rejected: keep, show in the queue
+          await qPut(it);
+        } finally {
+          live.delete(it.id);
         }
+        await refreshQueue();
+        if (location.hash === '#/queue') viewQueue();
       }
-      progress = '';
+      progress = paused() && !force ? 'Upload pausiert' : '';
     } catch (e) {
       progress = 'Upload unterbrochen – neuer Versuch folgt';
       setTimeout(processQueue, 20000);
@@ -192,7 +240,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
       const m = location.hash.match(/^#\/site\/([a-f0-9]+)/);
       if (m) { photos = await api(`sites/${m[1]}/photos`).catch(() => photos); }
       await load().catch(() => {});
-      if (!document.getElementById('lb')) render();
+      if (!document.getElementById('lb') && !document.querySelector('dialog[open]')) render();
     }
   }
   window.addEventListener('online', processQueue);
@@ -248,6 +296,67 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res(null), { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
   });
 
+  // ---------------------------------------------------------------- upload quality (per device)
+  const PRESETS = {
+    original: { label: 'Original', max: 0, q: 1, hint: 'unverändert' },
+    large: { label: 'Groß', max: 3000, q: 0.88, hint: '3000 px · 88 %' },
+    medium: { label: 'Mittel', max: 2000, q: 0.8, hint: '2000 px · 80 %' },
+    small: { label: 'Klein', max: 1280, q: 0.7, hint: '1280 px · 70 %' },
+  };
+  const quality = () => {
+    const qs = ls.get('quality', { preset: 'large' });
+    if (qs.preset === 'custom') return { preset: 'custom', label: 'Eigene', max: qs.max || 2500, q: qs.q || 0.85 };
+    return { preset: qs.preset in PRESETS ? qs.preset : 'large', ...PRESETS[qs.preset in PRESETS ? qs.preset : 'large'] };
+  };
+  const qualityText = (qs = quality()) => (qs.preset === 'original' ? 'Original (unverändert)' : `${qs.label} · ${qs.max} px · ${Math.round(qs.q * 100)} %`);
+  // rough size of a typical 12-MP phone photo (4:3) for the chosen setting
+  const estimate = (qs) => {
+    if (qs.preset === 'original') return 'ca. 3–8 MB';
+    const px = Math.min(qs.max, 4032);
+    const mp = (px * px * 0.75) / 1e6;
+    const bpp = 0.25 + Math.pow(qs.q, 4) * 1.5; // bytes per pixel, empirical for JPEG photos
+    const mb = (mp * 1e6 * bpp) / 8 / 1e6 * 4;
+    return mb < 1 ? `ca. ${Math.round(mb * 1000 / 50) * 50} KB` : `ca. ${mb.toFixed(1).replace('.', ',')} MB`;
+  };
+  function qualitySheet() {
+    const cur = ls.get('quality', { preset: 'large' });
+    let sel = cur.preset || 'large';
+    let max = cur.max || 2500, q = Math.round((cur.q || 0.85) * 100);
+    const d = document.createElement('dialog');
+    d.className = 'sheet';
+    document.body.appendChild(d);
+    const draw = () => {
+      const qs = sel === 'custom' ? { preset: 'custom', label: 'Eigene', max, q: q / 100 } : { preset: sel, ...PRESETS[sel] };
+      d.innerHTML = `<form method="dialog"><h2>Foto-Größe & Qualität</h2>
+        <p class="help" style="margin:0">Gilt für alle neuen Fotos auf diesem Gerät. Kleiner = schnellerer Upload und weniger Speicher.</p>
+        <div class="preset">${Object.entries(PRESETS).map(([k, p]) => `<button type="button" data-q="${k}" aria-pressed="${sel === k}"><b>${p.label}</b><span>${p.hint}</span></button>`).join('')}
+          <button type="button" data-q="custom" aria-pressed="${sel === 'custom'}" style="grid-column:1/-1"><b>Eigene Einstellung</b><span>Größe und Qualität selbst wählen</span></button></div>
+        ${sel === 'custom' ? `<div class="field"><label for="qMax">Längste Seite: <b id="qMaxV">${max} px</b></label><input type="range" id="qMax" min="800" max="6000" step="100" value="${max}"></div>
+          <div class="field"><label for="qQ">JPEG-Qualität: <b id="qQV">${q} %</b></label><input type="range" id="qQ" min="40" max="100" step="1" value="${q}"></div>` : ''}
+        <div class="hint info">Pro Foto (12 MP Handykamera): <b id="qEst">${estimate(qs)}</b></div>
+        ${sel === 'original' ? '<p class="help" style="margin:0">Originale können sehr groß sein. Fotos über 16 MB lehnt der Server ab.</p>' : ''}
+        <div class="actions"><button class="btn" value="cancel">Abbrechen</button><button class="btn primary" value="ok">Übernehmen</button></div></form>`;
+      const mx = d.querySelector('#qMax'), qq = d.querySelector('#qQ');
+      const upd = () => {
+        max = +mx.value; q = +qq.value;
+        d.querySelector('#qMaxV').textContent = max + ' px'; d.querySelector('#qQV').textContent = q + ' %';
+        d.querySelector('#qEst').textContent = estimate({ preset: 'custom', max, q: q / 100 });
+      };
+      if (mx) { mx.oninput = upd; qq.oninput = upd; }
+    };
+    d.addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { sel = b.dataset.q; draw(); } });
+    d.addEventListener('close', () => {
+      if (d.returnValue === 'ok') {
+        ls.set('quality', sel === 'custom' ? { preset: 'custom', max, q: q / 100 } : { preset: sel });
+        toast('Foto-Qualität: ' + qualityText());
+        if (!document.getElementById('lb')) render();
+      }
+      d.remove();
+    });
+    draw();
+    d.showModal();
+  }
+
   /** Camera / gallery → resize → queue → upload */
   function pick(siteId, source) {
     const input = document.createElement('input');
@@ -270,7 +379,11 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
         if (f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name)) {
           Object.assign(meta, await readExif(f));
           if (!meta.takenAt) meta.takenAt = new Date(source === 'camera' ? Date.now() : f.lastModified || Date.now()).toISOString();
-          try { blob = await resize(f); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (_) { /* e.g. HEIC on some browsers: upload the original */ }
+          const qs = quality();
+          if (qs.preset !== 'original') {
+            try { blob = await resize(f, qs.max, qs.q); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (_) { /* e.g. HEIC on some browsers: upload the original */ }
+          }
+          meta.quality = qs.preset === 'original' ? 'original' : `${qs.max}px/${Math.round(qs.q * 100)}%`;
         }
         if (meta.lat === undefined && pos) { const p = await pos; if (p) Object.assign(meta, p); }
         await qPut({ id: uid(), siteId, blob, name, meta, added: Date.now() });
@@ -311,10 +424,10 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     const list = state.sites.filter((s) => s.archived === showArchived && (!term || `${s.name} ${s.address} ${s.customer}`.toLowerCase().includes(term)));
     const archivedCount = state.sites.filter((s) => s.archived).length;
     const waiting = queueItems.length;
-    $app.innerHTML = `${header('Baustellen', `${state.sites.filter((s) => !s.archived).length} aktiv`, null, '<a href="../">Bau-App</a>')}
+    $app.innerHTML = `${header('Baustellen', `${state.sites.filter((s) => !s.archived).length} aktiv`, null, `${queueItems.length ? `<button data-go="#/queue">Warteschlange (${queueItems.length})</button>` : ''}<a href="../">Bau-App</a>`)}
       <main>
         <button class="btn primary big" data-act="new-site">+ Neue Baustelle</button>
-        ${waiting ? `<div class="hint warn" data-upload-status>${esc(progress || `${waiting} Foto(s) warten auf Upload`)}</div>` : ''}
+        ${waiting ? `<button class="hint warn" data-go="#/queue" style="border:0;text-align:left;cursor:pointer"><span data-upload-status>${esc(progress || `${waiting} Foto(s) warten auf Upload`)}</span> · Warteschlange ansehen</button>` : ''}
         <input type="search" id="search" placeholder="Baustelle, Adresse oder Kunde suchen" value="${esc(search)}" aria-label="Baustellen suchen">
         <div class="chips"><button class="chip" data-act="arch" data-v="0" aria-pressed="${!showArchived}">Aktiv</button><button class="chip" data-act="arch" data-v="1" aria-pressed="${showArchived}">Archiv (${archivedCount})</button></div>
         ${list.length ? `<div class="sites">${list.map((s) => `<button class="site" data-go="#/site/${s.id}">
@@ -363,7 +476,8 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
           <div class="chips" id="catPick">${Object.entries(cats).map(([k, l]) => `<button class="chip cat" data-cat="${k}" aria-pressed="${k === current}">${esc(l)}</button>`).join('')}</div>
           <input id="upNote" placeholder="Notiz zu den nächsten Fotos (optional)" aria-label="Notiz zu den nächsten Fotos">
           <div class="actions"><button class="btn primary big" data-act="pick" data-src="camera">${icon('camera')}Foto aufnehmen</button><button class="btn big" data-act="pick" data-src="gallery">${icon('image')}Aus Galerie</button></div>
-          ${queueItems.length || progress ? `<div class="help" data-upload-status>${esc(progress || `${queueItems.length} Foto(s) warten auf Upload`)}</div>` : ''}
+          <div class="help">Foto-Qualität: <button class="qlink" data-act="quality">${esc(qualityText())}</button></div>
+          ${queueItems.length || progress ? `<div class="help"><span data-upload-status>${esc(progress || `${queueItems.length} Foto(s) warten auf Upload`)}</span> · <button class="qlink" data-go="#/queue">Warteschlange</button></div>` : ''}
         </section>
         ${photos.length ? `<div class="row"><span class="help">${selecting ? 'Fotos antippen zum Auswählen' : 'Tipp: Foto lange drücken zum Auswählen'}</span>${selecting ? '' : '<button class="btn small" data-act="sel-start">Auswählen</button>'}</div>` : ''}
         ${all.length ? `<div class="chips"><button class="chip" data-filter="alle" aria-pressed="${filter === 'alle'}">Alle <span class="n">${all.length}</span></button>
@@ -383,8 +497,63 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     };
   }
 
+  const mb = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB');
+
+  function viewQueue() {
+    const items = [...queueItems].sort((a, b) => a.added - b.added);
+    const total = items.reduce((n, it) => n + it.blob.size, 0) + doneBytes;
+    const errors = items.filter((it) => it.error).length;
+    const siteName = (id) => (state.sites.find((s) => s.id === id) || {}).name || 'Baustelle';
+    $app.innerHTML = `${header('Warteschlange', items.length ? `${items.length} ${items.length === 1 ? 'Datei wartet' : 'Dateien warten'} · ${mb(items.reduce((n, it) => n + it.blob.size, 0))}` : 'Alles hochgeladen', '#/')}
+      <main>
+        <section class="card">
+          <div class="row"><b data-q-status>${esc(progress || (items.length ? (paused() ? 'Upload pausiert' : navigator.onLine ? 'Bereit' : 'Offline – wartet auf Verbindung') : 'Keine wartenden Fotos'))}</b><span class="help" data-q-pct>${total ? Math.round((doneBytes / total) * 100) + ' %' : ''}</span></div>
+          <div class="bigbar" aria-hidden="true"><span data-q-total style="width:${total ? Math.round((doneBytes / total) * 100) : 100}%"></span></div>
+          <div class="help" data-q-sum>${doneCount ? `${doneCount} in dieser Sitzung hochgeladen (${mb(doneBytes)})` : ''}</div>
+          ${items.length ? `<div class="actions">${paused()
+              ? '<button class="btn primary" data-act="q-resume">Fortsetzen</button>'
+              : `<button class="btn" data-act="q-pause">Pausieren</button><button class="btn primary" data-act="q-now">Jetzt hochladen</button>`}</div>` : ''}
+          <div class="help">Foto-Qualität für neue Fotos: <button class="qlink" data-act="quality">${esc(qualityText())}</button></div>
+        </section>
+        ${errors ? `<div class="hint warn">${errors} ${errors === 1 ? 'Datei konnte' : 'Dateien konnten'} nicht hochgeladen werden – erneut versuchen oder entfernen.</div>` : ''}
+        ${items.length ? `<section class="card" style="gap:0">${items.map((it) => {
+          const l = live.get(it.id);
+          const pct = l ? Math.round((l.loaded / (l.total || 1)) * 100) : 0;
+          return `<div class="qitem" data-qid="${it.id}">
+            <span class="qthumb" ${previewUrls.has(it.id) ? `style="background-image:url('${previewUrls.get(it.id)}')"` : ''}>${previewUrls.has(it.id) ? '' : 'Datei'}</span>
+            <span class="grow"><span class="t1">${esc(siteName(it.siteId))}</span>
+              <span class="t2">${esc(state.categories[it.meta.category] || '')} · ${mb(it.blob.size)}${it.meta.quality ? ' · ' + esc(it.meta.quality === 'original' ? 'Original' : it.meta.quality) : ''}</span>
+              <span class="t2 ${it.error ? 'err' : ''}" data-qtext>${it.error ? 'Fehler: ' + esc(it.error) : l ? `Lädt hoch … ${pct} %` : 'wartet'}</span>
+              <span class="progress"><span data-qbar style="width:${pct}%"></span></span></span>
+            <span class="qbtns">${it.error ? `<button class="btn small" data-act="q-retry" data-id="${it.id}">Erneut</button>` : ''}<button class="btn small danger" data-act="q-remove" data-id="${it.id}" aria-label="Aus der Warteschlange entfernen">Entfernen</button></span>
+          </div>`;
+        }).join('')}</section>` : '<p class="help">Neue Fotos erscheinen hier, bis sie auf dem Server sind.</p>'}
+      </main>`;    renderQueueProgress(); // include the bytes of the file being uploaded right now
+  }
+
+  /** Update bars in place while bytes flow (no re-render). */
+  function renderQueueProgress() {
+    if (location.hash !== '#/queue') return;
+    const waiting = queueItems.reduce((n, it) => n + it.blob.size, 0);
+    let inFlight = 0;
+    live.forEach((l, id) => {
+      inFlight += l.loaded;
+      const row = document.querySelector(`[data-qid="${id}"]`);
+      if (!row) return;
+      const pct = Math.round((l.loaded / (l.total || 1)) * 100);
+      row.querySelector('[data-qbar]').style.width = pct + '%';
+      row.querySelector('[data-qtext]').textContent = `Lädt hoch … ${pct} %`;
+    });
+    const total = waiting + doneBytes;
+    const pct = total ? Math.round(((doneBytes + inFlight) / total) * 100) : 100;
+    const bar = document.querySelector('[data-q-total]'); if (bar) bar.style.width = pct + '%';
+    const p = document.querySelector('[data-q-pct]'); if (p) p.textContent = pct + ' %';
+    const st = document.querySelector('[data-q-status]'); if (st && progress) st.textContent = progress;
+  }
+
   function renderUploadStatus() {
     document.querySelectorAll('[data-upload-status]').forEach((el) => (el.textContent = progress || `${queueItems.length} Foto(s) warten auf Upload`));
+    renderQueueProgress();
   }
 
   // ---------------------------------------------------------------- lightbox
@@ -593,6 +762,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     }
     lastSite = null;
     selecting = false; selected.clear();
+    if (location.hash === '#/queue') return viewQueue();
     viewSites();
   }
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
@@ -609,6 +779,17 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     const a = b.dataset.act;
     if (a === 'new-site') siteSheet(null);
     else if (a === 'share') shareSheet(location.hash.split('/')[2]);
+    else if (a === 'quality') qualitySheet();
+    else if (a === 'q-pause') { ls.set('paused', true); progress = 'Upload pausiert'; viewQueue(); }
+    else if (a === 'q-resume') { ls.set('paused', false); progress = ''; viewQueue(); processQueue(); }
+    else if (a === 'q-now') { ls.set('paused', false); processQueue(true); }
+    else if (a === 'q-retry') {
+      const it = queueItems.find((x) => x.id === b.dataset.id);
+      if (it) { delete it.error; qPut(it).then(() => { refreshQueue().then(viewQueue); processQueue(); }); }
+    } else if (a === 'q-remove') {
+      if (!confirm('Dieses Foto aus der Warteschlange entfernen? Es wird dann nicht hochgeladen.')) return;
+      qDel(b.dataset.id).then(async () => { const u = previewUrls.get(b.dataset.id); if (u) { URL.revokeObjectURL(u); previewUrls.delete(b.dataset.id); } await refreshQueue(); viewQueue(); });
+    }
     else if (a === 'sel-start') { selecting = true; selected.clear(); viewSite(location.hash.split('/')[2]); }
     else if (a === 'sel-end') { selecting = false; selected.clear(); viewSite(location.hash.split('/')[2]); }
     else if (a === 'sel-all') {

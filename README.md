@@ -101,6 +101,11 @@ Fotos von Baustellen geordnet hochladen, gleiche Anmeldung wie die Bau-App; alle
 - **Auswählen:** „Auswählen“ oder Foto lange drücken → Fotos antippen, ganzen Tag oder alle wählen →
   **Löschen** (nach `_entfernt/`) oder **Teilen**: als Dateien (Teilen-Menü des Handys: WhatsApp, Mail …), als ZIP
   oder als Link nur für die ausgewählten Fotos. Einzelne Fotos auch in der Großansicht über „Teilen“.
+- **Warteschlange** (`#/queue`, Link erscheint, sobald etwas wartet): jedes wartende Foto mit Vorschau, Größe,
+  Fortschrittsbalken; Gesamtfortschritt; Pausieren/Fortsetzen, „Jetzt hochladen“, erneut versuchen, entfernen.
+  Vom Server abgelehnte Fotos (z. B. zu groß) bleiben mit Fehlermeldung stehen.
+- **Foto-Größe & Qualität** (pro Gerät): Original, Groß 3000 px/88 %, Mittel 2000 px/80 %, Klein 1280 px/70 % oder
+  eigene Werte (800–6000 px, 40–100 %), mit geschätzter Dateigröße. Der Server nimmt Dateien bis `post_max_size` (16 MB) an.
 - **Teilen mit Beobachtern:** In der Baustelle „Teilen“ → Link für eine Person erstellen (7/30/90 Tage oder
   unbegrenzt). Der Link (`baustelle/share.php?t=…`) zeigt nur diese Baustelle, ohne Login, schreibgeschützt,
   ohne Notizen und Benutzernamen, mit ZIP-Download. Aufrufe werden gezählt, Links lassen sich jederzeit sperren.
