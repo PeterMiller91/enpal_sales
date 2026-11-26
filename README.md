@@ -104,6 +104,9 @@ Fotos von Baustellen geordnet hochladen, gleiche Anmeldung wie die Bau-App; alle
 - **Warteschlange** (`#/queue`, Link erscheint, sobald etwas wartet): jedes wartende Foto mit Vorschau, Größe,
   Fortschrittsbalken; Gesamtfortschritt; Pausieren/Fortsetzen, „Jetzt hochladen“, erneut versuchen, entfernen.
   Vom Server abgelehnte Fotos (z. B. zu groß) bleiben mit Fehlermeldung stehen.
+- **Nichts geht verloren:** Nach der Auswahl kommen alle Fotos sofort unverändert in die Warteschlange (IndexedDB);
+  Verkleinern und Hochladen laufen danach im Hintergrund weiter. Wird die Seite verlassen oder geschlossen, geht es
+  beim nächsten Öffnen dort weiter. Nur in den Sekunden des Speicherns warnt der Browser vor dem Verlassen.
 - **Foto-Größe & Qualität** (pro Gerät): Original, Groß 3000 px/88 %, Mittel 2000 px/80 %, Klein 1280 px/70 % oder
   eigene Werte (800–6000 px, 40–100 %), mit geschätzter Dateigröße. Der Server nimmt Dateien bis `post_max_size` (16 MB) an.
 - **Teilen mit Beobachtern:** In der Baustelle „Teilen“ → Link für eine Person erstellen (7/30/90 Tage oder

@@ -200,18 +200,67 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     });
   }
 
+  // ---------------------------------------------------------------- background preparation (EXIF + resize)
+  let storing = 0;      // originals being written to IndexedDB right now
+  let preparing = false;
+  async function prepareQueue() {
+    if (preparing) return;
+    preparing = true;
+    try {
+      for (;;) {
+        const raw = (await qAll()).filter((it) => it.raw).sort((a, b) => a.added - b.added);
+        if (!raw.length) break;
+        const it = raw[0];
+        const f = it.blob;
+        const meta = { ...it.meta };
+        let blob = f, name = it.name;
+        const isImage = (f.type || '').startsWith('image/') || /\.(jpe?g|png|heic|heif|webp)$/i.test(name);
+        if (isImage) {
+          const ex = await readExif(f, name);
+          Object.assign(meta, ex, meta.lat !== undefined ? { lat: meta.lat, lng: meta.lng } : {});
+          if (ex.takenAt) meta.takenAt = ex.takenAt;
+          if (!meta.takenAt) meta.takenAt = new Date(f.lastModified || it.added).toISOString();
+          const qs = it.quality || quality();
+          if (qs.preset !== 'original') {
+            try { blob = await resize(f, qs.max, qs.q); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (_) { /* e.g. HEIC: upload the original */ }
+          }
+          meta.quality = qs.preset === 'original' ? 'original' : `${qs.max}px/${Math.round(qs.q * 100)}%`;
+        }
+        // removed from the queue meanwhile? then do not bring it back
+        const still = await q('readonly', (st) => st.get(it.id));
+        if (!still) continue;
+        await qPut({ ...still, blob, name, meta: { ...meta, lat: still.meta.lat ?? meta.lat, lng: still.meta.lng ?? meta.lng }, raw: false });
+        await refreshQueue();
+        if (location.hash === '#/queue') viewQueue(); else renderUploadStatus();
+        processQueue(); // upload while the next photo is prepared
+      }
+    } finally {
+      preparing = false;
+    }
+  }
+
+  // Only while originals are being stored is leaving risky; afterwards everything resumes on the next visit.
+  window.addEventListener('beforeunload', (e) => {
+    if (storing > 0) { e.preventDefault(); e.returnValue = ''; }
+  });
+
   async function processQueue(force = false) {
     if (uploading || !navigator.onLine || !state.user || state.user === 'offline') return;
     if (paused() && !force) { progress = 'Upload pausiert'; renderUploadStatus(); return; }
     uploading = true;
     try {
+      let round = 0;
+      for (;;) {
       await refreshQueue();
-      // items that failed for good (e.g. too large) wait for the user: retry or remove in the queue view
-      const todo = queueItems.filter((it) => !it.error || force).sort((a, b) => a.added - b.added);
+      // only prepared photos; those that failed for good (e.g. too large) wait for the user: retry or remove
+      const todo = queueItems.filter((it) => !it.raw && (!it.error || (force && round === 0))).sort((a, b) => a.added - b.added);
+      round++;
+      if (!todo.length || (paused() && !force)) break;
       for (let i = 0; i < todo.length; i++) {
         if (paused() && !force) break;
         const it = todo[i];
-        progress = `Lädt hoch ${i + 1}/${todo.length} …`;
+        const left = queueItems.length;
+        progress = `Lädt hoch … noch ${left} ${left === 1 ? 'Datei' : 'Dateien'}`;
         renderUploadStatus();
         live.set(it.id, { loaded: 0, total: it.blob.size });
         renderQueueProgress();
@@ -230,6 +279,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
         await refreshQueue();
         if (location.hash === '#/queue') viewQueue();
       }
+      }
       progress = paused() && !force ? 'Upload pausiert' : '';
     } catch (e) {
       progress = 'Upload unterbrochen – neuer Versuch folgt';
@@ -247,9 +297,9 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
   setInterval(processQueue, 60000);
 
   // ---------------------------------------------------------------- image handling
-  async function readExif(file) {
+  async function readExif(file, name = file.name || '') {
     try {
-      if (!/jpe?g/i.test(file.type) && !/\.jpe?g$/i.test(file.name)) return {};
+      if (!/jpe?g/i.test(file.type) && !/\.jpe?g$/i.test(name)) return {};
       const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
       if (v.getUint16(0) !== 0xffd8) return {};
       let off = 2;
@@ -371,27 +421,37 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
       input.remove();
       if (!files.length) return;
       const category = ls.get('cat-' + siteId, 'vorher');
-      const note = (document.getElementById('upNote') || {}).value || '';
-      toast(`${files.length} Datei(en) werden vorbereitet …`, 2000);
-      for (const f of files) {
-        const meta = { category, note: note.trim(), name: f.name };
-        let blob = f, name = f.name || 'foto.jpg';
-        if (f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp)$/i.test(f.name)) {
-          Object.assign(meta, await readExif(f));
-          if (!meta.takenAt) meta.takenAt = new Date(source === 'camera' ? Date.now() : f.lastModified || Date.now()).toISOString();
-          const qs = quality();
-          if (qs.preset !== 'original') {
-            try { blob = await resize(f, qs.max, qs.q); name = name.replace(/\.[^.]+$/, '') + '.jpg'; } catch (_) { /* e.g. HEIC on some browsers: upload the original */ }
-          }
-          meta.quality = qs.preset === 'original' ? 'original' : `${qs.max}px/${Math.round(qs.q * 100)}%`;
-        }
-        if (meta.lat === undefined && pos) { const p = await pos; if (p) Object.assign(meta, p); }
-        await qPut({ id: uid(), siteId, blob, name, meta, added: Date.now() });
+      const note = ((document.getElementById('upNote') || {}).value || '').trim();
+      const qs = quality();
+      const now = Date.now();
+      // 1) all originals go into the queue at once (one transaction) – nothing is lost if the page is left now
+      const items = files.map((f, i) => ({
+        id: uid(), siteId, blob: f, name: f.name || 'foto.jpg', added: now + i, raw: true,
+        source, quality: { preset: qs.preset, max: qs.max, q: qs.q },
+        meta: { category, note, name: f.name || '', takenAt: source === 'camera' ? new Date(now).toISOString() : undefined },
+      }));
+      storing++;
+      try {
+        await q('readwrite', (st) => items.forEach((it) => st.put(it)));
+      } catch (e) {
+        toast('Fotos konnten nicht gespeichert werden: ' + e.message, 6000);
+        return;
+      } finally {
+        storing--;
       }
       const n = document.getElementById('upNote'); if (n) n.value = '';
+      toast(`${items.length} ${items.length === 1 ? 'Foto ist' : 'Fotos sind'} in der Warteschlange – die Seite darf jetzt verlassen werden.`, 3500);
+      // camera: add the position once it is known (if the photos are not prepared yet)
+      if (pos) pos.then(async (p) => {
+        if (!p) return;
+        for (const it of items) {
+          const cur = await q('readonly', (st) => st.get(it.id));
+          if (cur && cur.raw && cur.meta.lat === undefined) { cur.meta.lat = p.lat; cur.meta.lng = p.lng; await qPut(cur); }
+        }
+      });
       await refreshQueue();
-      render();
-      processQueue();
+      if (!document.getElementById('lb')) render();
+      prepareQueue();
     };
     document.body.appendChild(input);
     input.click();
@@ -522,8 +582,8 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
           return `<div class="qitem" data-qid="${it.id}">
             <span class="qthumb" ${previewUrls.has(it.id) ? `style="background-image:url('${previewUrls.get(it.id)}')"` : ''}>${previewUrls.has(it.id) ? '' : 'Datei'}</span>
             <span class="grow"><span class="t1">${esc(siteName(it.siteId))}</span>
-              <span class="t2">${esc(state.categories[it.meta.category] || '')} · ${mb(it.blob.size)}${it.meta.quality ? ' · ' + esc(it.meta.quality === 'original' ? 'Original' : it.meta.quality) : ''}</span>
-              <span class="t2 ${it.error ? 'err' : ''}" data-qtext>${it.error ? 'Fehler: ' + esc(it.error) : l ? `Lädt hoch … ${pct} %` : 'wartet'}</span>
+              <span class="t2">${esc(state.categories[it.meta.category] || '')} · ${mb(it.blob.size)}${it.raw ? ' (Original)' : it.meta.quality ? ' · ' + esc(it.meta.quality === 'original' ? 'Original' : it.meta.quality) : ''}</span>
+              <span class="t2 ${it.error ? 'err' : ''}" data-qtext>${it.error ? 'Fehler: ' + esc(it.error) : l ? `Lädt hoch … ${pct} %` : it.raw ? 'wird vorbereitet …' : 'wartet auf Upload'}</span>
               <span class="progress"><span data-qbar style="width:${pct}%"></span></span></span>
             <span class="qbtns">${it.error ? `<button class="btn small" data-act="q-retry" data-id="${it.id}">Erneut</button>` : ''}<button class="btn small danger" data-act="q-remove" data-id="${it.id}" aria-label="Aus der Warteschlange entfernen">Entfernen</button></span>
           </div>`;
@@ -850,6 +910,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     try { await load(); } catch (e) { if (e.status === 401) return; toast('Server nicht erreichbar – Fotos werden auf dem Gerät gesammelt', 5000); state.user = state.user || 'offline'; }
     await refreshQueue().catch(() => {});
     render();
+    prepareQueue(); // photos selected before the page was left are prepared now
     processQueue();
   }
   boot();
