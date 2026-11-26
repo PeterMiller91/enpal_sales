@@ -46,6 +46,13 @@ final class SitePhotos
                 original_name TEXT, uploaded_by TEXT, uploaded_at TEXT NOT NULL, deleted_at TEXT
             );
             CREATE INDEX IF NOT EXISTS photos_site ON photos(site_id, day);
+            -- read-only links for observers (token looked up by its hash; kept so the link can be copied again)
+            CREATE TABLE IF NOT EXISTS shares (
+                id TEXT PRIMARY KEY, site_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, token TEXT NOT NULL, label TEXT NOT NULL,
+                created_by TEXT, created_at TEXT NOT NULL, expires_at TEXT, revoked_at TEXT,
+                access_count INTEGER NOT NULL DEFAULT 0, last_access_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS shares_site ON shares(site_id);
         SQL);
     }
 
@@ -294,6 +301,77 @@ final class SitePhotos
         $zip->close();
         if (!$n) { @unlink($file); throw new HttpError(404, 'Keine Fotos zum Herunterladen'); }
         return ['file' => $file, 'name' => $site['folder'] . ($day ? "_$day" : '') . '.zip'];
+    }
+
+    // ---------------------------------------------------------------- read-only links for observers
+
+    /** Create a read-only link for an observer. */
+    public function createShare(string $siteId, string $label, ?int $days, string $user): array
+    {
+        $this->site($siteId);
+        $label = trim(mb_substr($label, 0, 80));
+        if ($label === '') throw new HttpError(400, 'Bitte angeben, für wen der Link ist');
+        $token = bin2hex(random_bytes(16));
+        $id = bin2hex(random_bytes(12));
+        $expires = $days ? gmdate('Y-m-d\TH:i:s\Z', time() + $days * 86400) : null;
+        $this->pdo->prepare('INSERT INTO shares (id, site_id, token_hash, token, label, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?)')
+            ->execute([$id, $siteId, hash('sha256', $token), $token, $label, $user, self::now(), $expires]);
+        return $this->shareOut($this->shareRow($id));
+    }
+
+    private function shareRow(string $id): array
+    {
+        $st = $this->pdo->prepare('SELECT * FROM shares WHERE id = ?');
+        $st->execute([$id]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) throw new HttpError(404, 'Freigabe nicht gefunden');
+        return $r;
+    }
+
+    private function shareOut(array $r): array
+    {
+        $expired = $r['expires_at'] !== null && $r['expires_at'] < self::now();
+        return [
+            'id' => $r['id'], 'token' => $r['token'], 'label' => $r['label'], 'createdBy' => $r['created_by'], 'createdAt' => $r['created_at'],
+            'expiresAt' => $r['expires_at'], 'revokedAt' => $r['revoked_at'], 'accessCount' => (int)$r['access_count'],
+            'lastAccessAt' => $r['last_access_at'], 'active' => $r['revoked_at'] === null && !$expired,
+        ];
+    }
+
+    public function shares(string $siteId): array
+    {
+        $st = $this->pdo->prepare('SELECT * FROM shares WHERE site_id = ? ORDER BY created_at DESC');
+        $st->execute([$siteId]);
+        return array_map([$this, 'shareOut'], $st->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function revokeShare(string $id): array
+    {
+        $this->pdo->prepare('UPDATE shares SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?')->execute([self::now(), $id]);
+        return $this->shareOut($this->shareRow($id));
+    }
+
+    /** Site for a valid token (counts the visit when $count); throws 404 for unknown, expired or revoked links. */
+    public function siteForToken(string $token, bool $count): array
+    {
+        if (!preg_match('/^[a-f0-9]{32}$/', $token)) throw new HttpError(404, 'Link ungültig');
+        $st = $this->pdo->prepare('SELECT * FROM shares WHERE token_hash = ?');
+        $st->execute([hash('sha256', $token)]);
+        $sh = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$sh) throw new HttpError(404, 'Link ungültig');
+        if ($sh['revoked_at'] !== null) throw new HttpError(410, 'Dieser Link wurde gesperrt.');
+        if ($sh['expires_at'] !== null && $sh['expires_at'] < self::now()) throw new HttpError(410, 'Dieser Link ist abgelaufen.');
+        if ($count) $this->pdo->prepare('UPDATE shares SET access_count = access_count + 1, last_access_at = ? WHERE id = ?')->execute([self::now(), $sh['id']]);
+        $site = $this->site($sh['site_id']);
+        return ['site' => $site, 'share' => $this->shareOut($sh)];
+    }
+
+    /** Photo of the shared site only. */
+    public function sharedPhoto(string $siteId, string $photoId): array
+    {
+        $p = $this->photo($photoId);
+        if ($p['site_id'] !== $siteId || $p['deleted_at']) throw new HttpError(404, 'Foto nicht gefunden');
+        return $this->file($photoId);
     }
 
     public function tmpDir(): string

@@ -98,6 +98,9 @@ Fotos von Baustellen geordnet hochladen, gleiche Anmeldung wie die Bau-App; alle
 - Ablage (per FTP sichtbar, im Web gesperrt):
   `daten/baustellen/<Baustelle>/<JJJJ-MM-TT>/<NN_Kategorie>/<Baustelle>_<Datum_Uhrzeit>_<Kategorie>_<ID>.jpg`,
   dazu `baustelle.txt` mit den Angaben; entfernte Fotos liegen in `<Baustelle>/_entfernt/`.
+- **Teilen mit Beobachtern:** In der Baustelle „Teilen“ → Link für eine Person erstellen (7/30/90 Tage oder
+  unbegrenzt). Der Link (`baustelle/share.php?t=…`) zeigt nur diese Baustelle, ohne Login, schreibgeschützt,
+  ohne Notizen und Benutzernamen, mit ZIP-Download. Aufrufe werden gezählt, Links lassen sich jederzeit sperren.
 
 ## Fahrtenbuch (`/fahrtenbuch`)
 

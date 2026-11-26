@@ -1,5 +1,5 @@
 /* Service worker: keeps the app shell available offline. API calls always go to the network. */
-const CACHE = 'bbc-shell-v10';
+const CACHE = 'bbc-shell-v11';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'db.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -17,7 +17,7 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('api.php')) return;
+  if (e.request.method !== 'GET' || url.origin !== location.origin || url.pathname.endsWith('api.php') || url.pathname.endsWith('share.php')) return;
   // Network first, so updates arrive immediately; cache as fallback when offline.
   e.respondWith(
     fetch(e.request)

@@ -56,6 +56,14 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
     if ($action === '' && $method === 'POST') json_out($sp->saveSite($siteId, json_body(), $user));
     if ($action === 'photos' && $method === 'GET') json_out($sp->photos($siteId));
 
+    // read-only links for observers
+    if ($action === 'shares' && $method === 'GET') json_out($sp->shares($siteId));
+    if ($action === 'shares' && $method === 'POST') {
+        $b = json_body();
+        $days = isset($b['days']) && (int)$b['days'] > 0 ? min(3650, (int)$b['days']) : null;
+        json_out($sp->createShare($siteId, (string)($b['label'] ?? ''), $days, $user));
+    }
+
     // one photo per request (multipart: file + meta JSON); the app sends photos already resized
     if ($action === 'upload' && $method === 'POST') {
         $photoId = (string)($_POST['id'] ?? '');
@@ -82,6 +90,11 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
         @unlink($z['file']);
         exit;
     }
+}
+
+if (($parts[0] ?? '') === 'shares' && isset($parts[1]) && ($parts[2] ?? '') === 'revoke' && $method === 'POST') {
+    if (!preg_match(ID_RE, $parts[1])) throw new HttpError(400, 'Ungültige ID');
+    json_out($sp->revokeShare($parts[1]));
 }
 
 if (($parts[0] ?? '') === 'photos' && isset($parts[1])) {
