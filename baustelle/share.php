@@ -42,13 +42,14 @@ try {
     fail_page(500, 'Der Server ist gerade nicht erreichbar.');
 }
 $site = $ctx['site'];
+$only = $ctx['share']['photoIds']; // null = whole site
 
 try {
     if ($route === 'data') {
         $photos = array_map(fn($p) => [
             'id' => $p['id'], 'category' => $p['category'], 'day' => $p['day'], 'takenAt' => $p['takenAt'],
             'pdf' => (bool)preg_match('/\.pdf$/i', $p['path']), 'name' => basename($p['path']),
-        ], $sp->photos($site['id']));
+        ], array_values(array_filter($sp->photos($site['id']), fn($p) => $only === null || in_array($p['id'], $only, true))));
         json_out([
             'site' => ['name' => $site['name'], 'address' => $site['address'] ?? ''],
             'expiresAt' => $ctx['share']['expiresAt'], 'categories' => SitePhotos::CATEGORIES, 'photos' => $photos,
@@ -56,7 +57,7 @@ try {
         ]);
     }
     if (in_array($parts[0] ?? '', ['thumb', 'photo'], true) && isset($parts[1]) && preg_match(ID_RE, $parts[1])) {
-        $f = $sp->sharedPhoto($site['id'], $parts[1]);
+        $f = $sp->sharedPhoto($site['id'], $parts[1], $only);
         $file = $f['abs'];
         $mime = $f['mime'] ?: 'application/octet-stream';
         if ($parts[0] === 'thumb' && ($t = $sp->thumbnail($parts[1]))) { $file = $t; $mime = 'image/jpeg'; }
@@ -72,7 +73,7 @@ try {
     }
     if ($route === 'zip') {
         $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['day'] ?? '')) ? $_GET['day'] : null;
-        $z = $sp->zip($site['id'], $day);
+        $z = $sp->zip($site['id'], $day, $only);
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/zip');
         header('Content-Length: ' . filesize($z['file']));

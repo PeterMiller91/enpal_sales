@@ -61,7 +61,8 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
     if ($action === 'shares' && $method === 'POST') {
         $b = json_body();
         $days = isset($b['days']) && (int)$b['days'] > 0 ? min(3650, (int)$b['days']) : null;
-        json_out($sp->createShare($siteId, (string)($b['label'] ?? ''), $days, $user));
+        $ids = is_array($b['photoIds'] ?? null) ? array_slice($b['photoIds'], 0, 2000) : null;
+        json_out($sp->createShare($siteId, (string)($b['label'] ?? ''), $days, $user, $ids));
     }
 
     // one photo per request (multipart: file + meta JSON); the app sends photos already resized
@@ -81,7 +82,8 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
 
     if ($action === 'zip' && $method === 'GET') {
         $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['day'] ?? '')) ? $_GET['day'] : null;
-        $z = $sp->zip($siteId, $day);
+        $ids = isset($_GET['ids']) ? array_values(array_filter(explode(',', (string)$_GET['ids']), fn($x) => preg_match(ID_RE, $x))) : null;
+        $z = $sp->zip($siteId, $day, $ids);
         while (ob_get_level()) ob_end_clean();
         header('Content-Type: application/zip');
         header('Content-Length: ' . filesize($z['file']));
@@ -90,6 +92,16 @@ if (($parts[0] ?? '') === 'sites' && isset($parts[1])) {
         @unlink($z['file']);
         exit;
     }
+}
+
+// remove several photos at once (moved to _entfernt/)
+if ($route === 'photos/remove' && $method === 'POST') {
+    $b = json_body();
+    $n = 0;
+    foreach (array_slice(is_array($b['ids'] ?? null) ? $b['ids'] : [], 0, 1000) as $pid) {
+        if (is_string($pid) && preg_match(ID_RE, $pid)) { $sp->removePhoto($pid); $n++; }
+    }
+    json_out(['ok' => true, 'removed' => $n]);
 }
 
 if (($parts[0] ?? '') === 'shares' && isset($parts[1]) && ($parts[2] ?? '') === 'revoke' && $method === 'POST') {

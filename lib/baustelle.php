@@ -54,6 +54,9 @@ final class SitePhotos
             );
             CREATE INDEX IF NOT EXISTS shares_site ON shares(site_id);
         SQL);
+        // v2: links limited to selected photos (JSON list of photo ids; NULL = whole site)
+        $cols = array_column($this->pdo->query('PRAGMA table_info(shares)')->fetchAll(PDO::FETCH_ASSOC), 'name');
+        if (!in_array('photo_ids', $cols, true)) $this->pdo->exec('ALTER TABLE shares ADD COLUMN photo_ids TEXT');
     }
 
     private function path(string ...$parts): string
@@ -284,7 +287,7 @@ final class SitePhotos
     }
 
     /** ZIP of all current photos of a site (optionally one day), keeping the folder structure. */
-    public function zip(string $siteId, ?string $day): array
+    public function zip(string $siteId, ?string $day, ?array $onlyIds = null): array
     {
         if (!class_exists('ZipArchive')) throw new HttpError(501, 'ZIP-Download ist auf diesem Server nicht verfügbar (PHP-Erweiterung zip).');
         $site = $this->site($siteId);
@@ -294,28 +297,35 @@ final class SitePhotos
         $n = 0;
         foreach ($this->photos($siteId) as $p) {
             if ($day && $p['day'] !== $day) continue;
+            if ($onlyIds !== null && !in_array($p['id'], $onlyIds, true)) continue;
             $abs = $this->path($site['folder'], $p['path']);
             if (is_file($abs)) { $zip->addFile($abs, $site['folder'] . '/' . $p['path']); $n++; }
         }
         if (is_file($this->path($site['folder'], 'baustelle.txt'))) $zip->addFile($this->path($site['folder'], 'baustelle.txt'), $site['folder'] . '/baustelle.txt');
         $zip->close();
         if (!$n) { @unlink($file); throw new HttpError(404, 'Keine Fotos zum Herunterladen'); }
-        return ['file' => $file, 'name' => $site['folder'] . ($day ? "_$day" : '') . '.zip'];
+        return ['file' => $file, 'name' => $site['folder'] . ($day ? "_$day" : '') . ($onlyIds !== null ? "_Auswahl_$n" : '') . '.zip'];
     }
 
     // ---------------------------------------------------------------- read-only links for observers
 
     /** Create a read-only link for an observer. */
-    public function createShare(string $siteId, string $label, ?int $days, string $user): array
+    public function createShare(string $siteId, string $label, ?int $days, string $user, ?array $photoIds = null): array
     {
         $this->site($siteId);
+        if ($photoIds !== null) {
+            // only current photos of this site
+            $valid = array_column($this->photos($siteId), 'id');
+            $photoIds = array_values(array_intersect(array_unique(array_map('strval', $photoIds)), $valid));
+            if (!$photoIds) throw new HttpError(400, 'Keine gültigen Fotos ausgewählt');
+        }
         $label = trim(mb_substr($label, 0, 80));
         if ($label === '') throw new HttpError(400, 'Bitte angeben, für wen der Link ist');
         $token = bin2hex(random_bytes(16));
         $id = bin2hex(random_bytes(12));
         $expires = $days ? gmdate('Y-m-d\TH:i:s\Z', time() + $days * 86400) : null;
-        $this->pdo->prepare('INSERT INTO shares (id, site_id, token_hash, token, label, created_by, created_at, expires_at) VALUES (?,?,?,?,?,?,?,?)')
-            ->execute([$id, $siteId, hash('sha256', $token), $token, $label, $user, self::now(), $expires]);
+        $this->pdo->prepare('INSERT INTO shares (id, site_id, token_hash, token, label, created_by, created_at, expires_at, photo_ids) VALUES (?,?,?,?,?,?,?,?,?)')
+            ->execute([$id, $siteId, hash('sha256', $token), $token, $label, $user, self::now(), $expires, $photoIds !== null ? json_encode($photoIds) : null]);
         return $this->shareOut($this->shareRow($id));
     }
 
@@ -335,6 +345,7 @@ final class SitePhotos
             'id' => $r['id'], 'token' => $r['token'], 'label' => $r['label'], 'createdBy' => $r['created_by'], 'createdAt' => $r['created_at'],
             'expiresAt' => $r['expires_at'], 'revokedAt' => $r['revoked_at'], 'accessCount' => (int)$r['access_count'],
             'lastAccessAt' => $r['last_access_at'], 'active' => $r['revoked_at'] === null && !$expired,
+            'photoIds' => isset($r['photo_ids']) && $r['photo_ids'] !== null ? json_decode($r['photo_ids'], true) : null,
         ];
     }
 
@@ -366,11 +377,12 @@ final class SitePhotos
         return ['site' => $site, 'share' => $this->shareOut($sh)];
     }
 
-    /** Photo of the shared site only. */
-    public function sharedPhoto(string $siteId, string $photoId): array
+    /** Photo of the shared site only (and of the selection, if the link is limited to one). */
+    public function sharedPhoto(string $siteId, string $photoId, ?array $onlyIds = null): array
     {
         $p = $this->photo($photoId);
         if ($p['site_id'] !== $siteId || $p['deleted_at']) throw new HttpError(404, 'Foto nicht gefunden');
+        if ($onlyIds !== null && !in_array($photoId, $onlyIds, true)) throw new HttpError(404, 'Foto nicht gefunden');
         return $this->file($photoId);
     }
 

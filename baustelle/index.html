@@ -71,6 +71,15 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); bo
 .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ph .badge { position: absolute; left: 4px; bottom: 4px; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(10, 42, 92, .85); color: #fff; }
 .ph .badge.wait { background: var(--yellow); color: var(--accent); }
+.ph .check { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: rgba(10, 42, 92, .35); display: flex; align-items: center; justify-content: center; color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.ph.sel { outline: 3px solid var(--yellow); outline-offset: -3px; }
+.ph.sel img { opacity: .8; }
+.ph.sel .check { background: var(--yellow); border-color: var(--yellow); }
+.selbar { position: sticky; bottom: 0; z-index: 6; background: var(--accent); color: #fff; border-top: 3px solid var(--yellow); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.selbar .count { font-weight: 700; flex: 1; min-width: 110px; }
+.selbar .btn { min-height: 40px; }
+.selbar .btn.ghost { background: transparent; border-color: rgba(255,255,255,.4); color: #fff; }
+@media (max-width: 520px) { .selbar .count { flex-basis: 100%; } .selbar .btn { flex: 1; padding: 0 8px; font-size: 13px; } }
 .ph .doc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent); }
 .progress { height: 6px; border-radius: 3px; background: var(--accent-soft); overflow: hidden; }
 .progress span { display: block; height: 100%; background: var(--yellow); }
@@ -319,6 +328,9 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
   }
 
   let filter = 'alle';
+  let selecting = false;
+  const selected = new Set();
+  const CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
   function viewSite(id) {
     const site = state.sites.find((s) => s.id === id);
     if (!site) { location.hash = '#/'; return; }
@@ -333,11 +345,15 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     const gallery = days.map((day) => {
       const inDay = shown.filter((p) => p.day === day);
       const byCat = Object.keys(cats).filter((c) => inDay.some((p) => p.category === c));
-      return `<section class="card"><div class="day"><h2>${esc(fmtDay(day))}</h2><a class="btn small" href="api.php?p=sites/${id}/zip&day=${day}">ZIP</a></div>
+      const dayIds = inDay.filter((p) => !p.pending).map((p) => p.id);
+      const dayAll = dayIds.length && dayIds.every((x) => selected.has(x));
+      return `<section class="card"><div class="day"><h2>${esc(fmtDay(day))}</h2>${selecting
+        ? `<button class="btn small" data-act="sel-day" data-day="${day}">${dayAll ? 'Tag abwählen' : 'Tag auswählen'}</button>`
+        : `<a class="btn small" href="api.php?p=sites/${id}/zip&day=${day}">ZIP</a>`}</div>
         ${byCat.map((c) => `<div class="cat-h">${esc(cats[c])} (${inDay.filter((p) => p.category === c).length})</div><div class="grid">
           ${inDay.filter((p) => p.category === c).map((p) => p.pending
             ? `<div class="ph">${previewUrls.has(p.id) ? `<img src="${previewUrls.get(p.id)}" alt="">` : '<span class="doc">Datei</span>'}<span class="badge wait">wartet</span></div>`
-            : `<button class="ph" data-photo="${p.id}" aria-label="Foto ${esc(cats[p.category])} öffnen">${/\.pdf$/i.test(p.path) ? '<span class="doc">PDF</span>' : `<img src="${photoUrl(p.id, '&thumb=1')}" alt="" loading="lazy">`}${p.note ? '<span class="badge">Notiz</span>' : ''}</button>`).join('')}</div>`).join('')}
+            : `<button class="ph${selected.has(p.id) ? ' sel' : ''}" data-photo="${p.id}" ${selecting ? `aria-pressed="${selected.has(p.id)}" aria-label="Foto ${esc(cats[p.category])} auswählen"` : `aria-label="Foto ${esc(cats[p.category])} öffnen"`}>${/\.pdf$/i.test(p.path) ? '<span class="doc">PDF</span>' : `<img src="${photoUrl(p.id, '&thumb=1')}" alt="" loading="lazy">`}${p.note ? '<span class="badge">Notiz</span>' : ''}${selecting ? `<span class="check">${selected.has(p.id) ? CHECK : ''}</span>` : ''}</button>`).join('')}</div>`).join('')}
       </section>`;
     }).join('');
     $app.innerHTML = `${header(site.name, esc([site.address, site.customer].filter(Boolean).join(' · ')), '#/', `<button data-act="share">Teilen</button><button data-act="edit-site">Bearbeiten</button>${site.photoCount ? `<a href="api.php?p=sites/${id}/zip">Alle (ZIP)</a>` : ''}`)}
@@ -349,11 +365,17 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
           <div class="actions"><button class="btn primary big" data-act="pick" data-src="camera">${icon('camera')}Foto aufnehmen</button><button class="btn big" data-act="pick" data-src="gallery">${icon('image')}Aus Galerie</button></div>
           ${queueItems.length || progress ? `<div class="help" data-upload-status>${esc(progress || `${queueItems.length} Foto(s) warten auf Upload`)}</div>` : ''}
         </section>
+        ${photos.length ? `<div class="row"><span class="help">${selecting ? 'Fotos antippen zum Auswählen' : 'Tipp: Foto lange drücken zum Auswählen'}</span>${selecting ? '' : '<button class="btn small" data-act="sel-start">Auswählen</button>'}</div>` : ''}
         ${all.length ? `<div class="chips"><button class="chip" data-filter="alle" aria-pressed="${filter === 'alle'}">Alle <span class="n">${all.length}</span></button>
           ${Object.entries(cats).filter(([k]) => counts[k]).map(([k, l]) => `<button class="chip" data-filter="${k}" aria-pressed="${filter === k}">${esc(l)} <span class="n">${counts[k]}</span></button>`).join('')}</div>` : ''}
         ${gallery || '<p class="help">Noch keine Fotos. Kategorie wählen und loslegen.</p>'}
         ${site.note ? `<div class="hint info">${esc(site.note)}</div>` : ''}
-      </main>`;
+      </main>
+      ${selecting ? `<div class="selbar" role="toolbar" aria-label="Auswahl"><span class="count">${selected.size} ausgewählt</span>
+        <button class="btn ghost" data-act="sel-all">${shown.filter((p) => !p.pending).every((p) => selected.has(p.id)) && selected.size ? 'Keine' : 'Alle'}</button>
+        <button class="btn primary" data-act="sel-share" ${selected.size ? '' : 'disabled'}>Teilen</button>
+        <button class="btn ghost" data-act="sel-delete" ${selected.size ? '' : 'disabled'}>Löschen</button>
+        <button class="btn ghost" data-act="sel-end">Fertig</button></div>` : ''}`;
     document.getElementById('catPick').onclick = (e) => {
       const b = e.target.closest('[data-cat]'); if (!b) return;
       ls.set('cat-' + id, b.dataset.cat);
@@ -386,7 +408,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
           <div class="help">${esc(fmtTs(p.takenAt || p.uploadedAt))} · hochgeladen von ${esc(p.uploadedBy)}${p.lat != null ? ` · <a href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=18/${p.lat}/${p.lng}" target="_blank" rel="noopener">Ort auf Karte</a>` : ''}</div>
           <div class="field"><label for="lbCat">Kategorie</label><select id="lbCat">${Object.entries(state.categories).map(([k, l]) => `<option value="${k}" ${k === p.category ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
           <div class="field"><label for="lbNote">Notiz</label><input id="lbNote" value="${esc(p.note)}"></div>
-          <div class="actions"><button class="btn danger" data-lb="remove">Entfernen</button><button class="btn blue" data-lb="save">Speichern</button></div>
+          <div class="actions"><button class="btn danger" data-lb="remove">Entfernen</button><button class="btn" data-lb="share">Teilen</button><button class="btn blue" data-lb="save">Speichern</button></div>
           <div class="help">Ablage: ${esc(p.path)}</div>
         </div>`;
     };
@@ -400,6 +422,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     lb.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-lb]'); if (!b) return;
       const a = b.dataset.lb, p = list[i];
+      if (a === 'share') return sendSheet(siteId, [p.id]);
       if (a === 'close') close();
       else if (a === 'prev') { i--; draw(); }
       else if (a === 'next') { i++; draw(); }
@@ -445,7 +468,7 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
         <div class="field"><label for="shDays">Gültig</label><select id="shDays"><option value="7">7 Tage</option><option value="30" selected>30 Tage</option><option value="90">90 Tage</option><option value="0">unbegrenzt (bis zum Sperren)</option></select></div>
         <button type="button" class="btn primary" data-sh="create">Link erstellen</button>
         ${list.length ? `<div class="lbl" style="margin-top:6px">Bestehende Links</div>${list.map((s) => `<div class="card" style="padding:10px;gap:6px">
-          <div class="row"><b>${esc(s.label)}</b><span class="help">${esc(status(s))}</span></div>
+          <div class="row"><b>${esc(s.label)}${s.photoIds ? ` <span class="help">(${s.photoIds.length} ${s.photoIds.length === 1 ? 'Foto' : 'Fotos'})</span>` : ''}</b><span class="help">${esc(status(s))}</span></div>
           <div class="help">erstellt ${esc(fmtTs(s.createdAt))} von ${esc(s.createdBy)} · ${s.accessCount}× geöffnet${s.lastAccessAt ? ', zuletzt ' + esc(fmtTs(s.lastAccessAt)) : ''}</div>
           ${s.active ? `<div class="actions"><button type="button" class="btn small" data-sh="copy" data-token="${s.token}" data-label="${esc(s.label)}">Link kopieren / senden</button><button type="button" class="btn small danger" data-sh="revoke" data-id="${s.id}">Sperren</button></div>` : ''}</div>`).join('')}` : ''}
         <button class="btn" value="close">Schließen</button></form>`;
@@ -468,6 +491,61 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     });
     d.addEventListener('close', () => d.remove());
     await draw();
+    d.showModal();
+  }
+
+  /** Share the given photos: as files (WhatsApp, mail …), as ZIP, or as a link limited to them. */
+  function sendSheet(siteId, ids) {
+    const n = ids.length;
+    const d = document.createElement('dialog');
+    d.className = 'sheet';
+    d.innerHTML = `<form method="dialog"><h2>${n === 1 ? 'Foto teilen' : `${n} Fotos teilen`}</h2>
+      <button type="button" class="btn primary big" data-s="files">Als ${n === 1 ? 'Foto' : 'Fotos'} senden (WhatsApp, Mail …)</button>
+      <button type="button" class="btn big" data-s="zip">${n === 1 ? 'Herunterladen' : 'Als ZIP herunterladen'}</button>
+      <div class="card" style="padding:12px;gap:8px"><b>Link nur für ${n === 1 ? 'dieses Foto' : 'diese Fotos'}</b>
+        <div class="field"><label for="slLabel">Für wen?</label><input id="slLabel" placeholder="z. B. Bauherr Müller"></div>
+        <div class="field"><label for="slDays">Gültig</label><select id="slDays"><option value="7">7 Tage</option><option value="30" selected>30 Tage</option><option value="90">90 Tage</option><option value="0">unbegrenzt (bis zum Sperren)</option></select></div>
+        <button type="button" class="btn blue" data-s="link">Link erstellen</button>
+        <p class="help" style="margin:0">Der Link zeigt nur ${n === 1 ? 'dieses Foto' : 'diese Fotos'}, ohne Login. Verwalten und sperren unter „Teilen“ der Baustelle.</p></div>
+      <p class="help" data-s-status style="margin:0"></p>
+      <button class="btn" value="close">Schließen</button></form>`;
+    document.body.appendChild(d);
+    const status = (t) => (d.querySelector('[data-s-status]').textContent = t);
+    d.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-s]'); if (!b) return;
+      if (b.dataset.s === 'zip') {
+        location.href = n === 1 ? photoUrl(ids[0], '&download=1') : `api.php?p=sites/${siteId}/zip&ids=${ids.join(',')}`;
+      } else if (b.dataset.s === 'files') {
+        try {
+          if (n > 30) { status('Bitte höchstens 30 Fotos auf einmal senden – oder als ZIP/Link teilen.'); return; }
+          status('Fotos werden geladen …');
+          const files = [];
+          for (const id of ids) {
+            const r = await fetch(photoUrl(id), { credentials: 'same-origin' });
+            if (!r.ok) throw new Error('Foto konnte nicht geladen werden');
+            const blob = await r.blob();
+            const p = photos.find((x) => x.id === id);
+            files.push(new File([blob], (p && p.path ? p.path.split('/').pop() : id + '.jpg'), { type: blob.type || 'image/jpeg' }));
+          }
+          if (navigator.canShare && navigator.canShare({ files })) {
+            status('');
+            await navigator.share({ files, title: 'Baustellen-Fotos' });
+          } else {
+            status('Dieses Gerät kann keine Dateien direkt teilen – die Fotos werden heruntergeladen.');
+            if (n === 1) location.href = photoUrl(ids[0], '&download=1'); else location.href = `api.php?p=sites/${siteId}/zip&ids=${ids.join(',')}`;
+          }
+        } catch (err) { if (err.name !== 'AbortError') status(err.message); else status(''); }
+      } else if (b.dataset.s === 'link') {
+        const label = d.querySelector('#slLabel').value.trim();
+        if (!label) { toast('Bitte angeben, für wen der Link ist'); d.querySelector('#slLabel').focus(); return; }
+        try {
+          const sh = await post(`sites/${siteId}/shares`, { label, days: Number(d.querySelector('#slDays').value), photoIds: ids });
+          await copyLink(shareLink(sh.token), label);
+          status('Link erstellt.');
+        } catch (err) { toast(err.message, 5000); }
+      }
+    });
+    d.addEventListener('close', () => d.remove());
     d.showModal();
   }
 
@@ -510,25 +588,82 @@ dialog.sheet form { display: flex; flex-direction: column; gap: 12px; }
     if (!state.user) return viewLogin();
     const m = location.hash.match(/^#\/site\/([a-f0-9]+)$/);
     if (m) {
-      if (lastSite !== m[1]) { lastSite = m[1]; filter = 'alle'; photos = []; viewSite(m[1]); photos = await api(`sites/${m[1]}/photos`).catch(() => []); }
+      if (lastSite !== m[1]) { lastSite = m[1]; filter = 'alle'; selecting = false; selected.clear(); photos = []; viewSite(m[1]); photos = await api(`sites/${m[1]}/photos`).catch(() => []); }
       return viewSite(m[1]);
     }
     lastSite = null;
+    selecting = false; selected.clear();
     viewSites();
   }
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
   $app.addEventListener('click', (e) => {
     const go = e.target.closest('[data-go]'); if (go) { location.hash = go.dataset.go; return; }
-    const ph = e.target.closest('[data-photo]'); if (ph) return openPhoto(ph.dataset.photo);
+    const ph = e.target.closest('[data-photo]');
+    if (ph) {
+      if (longPressed) { longPressed = false; return; }
+      if (selecting) { toggleSel(ph.dataset.photo); return; }
+      return openPhoto(ph.dataset.photo);
+    }
     const f = e.target.closest('[data-filter]'); if (f) { filter = f.dataset.filter; return viewSite(location.hash.split('/')[2]); }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.dataset.act;
     if (a === 'new-site') siteSheet(null);
     else if (a === 'share') shareSheet(location.hash.split('/')[2]);
+    else if (a === 'sel-start') { selecting = true; selected.clear(); viewSite(location.hash.split('/')[2]); }
+    else if (a === 'sel-end') { selecting = false; selected.clear(); viewSite(location.hash.split('/')[2]); }
+    else if (a === 'sel-all') {
+      const ids = photos.filter((p) => filter === 'alle' || p.category === filter).map((p) => p.id);
+      const all = ids.length && ids.every((x) => selected.has(x));
+      ids.forEach((x) => (all ? selected.delete(x) : selected.add(x)));
+      viewSite(location.hash.split('/')[2]);
+    } else if (a === 'sel-day') {
+      const ids = photos.filter((p) => p.day === b.dataset.day && (filter === 'alle' || p.category === filter)).map((p) => p.id);
+      const all = ids.every((x) => selected.has(x));
+      ids.forEach((x) => (all ? selected.delete(x) : selected.add(x)));
+      viewSite(location.hash.split('/')[2]);
+    } else if (a === 'sel-share') sendSheet(location.hash.split('/')[2], [...selected]);
+    else if (a === 'sel-delete') deleteSelected(location.hash.split('/')[2]);
     else if (a === 'edit-site') siteSheet(state.sites.find((s) => s.id === location.hash.split('/')[2]));
     else if (a === 'pick') pick(location.hash.split('/')[2], b.dataset.src);
     else if (a === 'arch') { showArchived = b.dataset.v === '1'; viewSites(); }
   });
+
+  function toggleSel(id) {
+    if (selected.has(id)) selected.delete(id); else selected.add(id);
+    const y = window.scrollY;
+    viewSite(location.hash.split('/')[2]);
+    window.scrollTo(0, y);
+  }
+
+  async function deleteSelected(siteId) {
+    const n = selected.size;
+    if (!n || !confirm(`${n} ${n === 1 ? 'Foto' : 'Fotos'} löschen? Sie werden auf dem Server in den Ordner „_entfernt“ verschoben.`)) return;
+    try {
+      await post('photos/remove', { ids: [...selected] });
+      photos = photos.filter((p) => !selected.has(p.id));
+      const s = state.sites.find((x) => x.id === siteId); if (s) s.photoCount = photos.length;
+      selected.clear(); selecting = false;
+      toast(`${n} ${n === 1 ? 'Foto' : 'Fotos'} gelöscht`);
+      viewSite(siteId);
+      load().catch(() => {});
+    } catch (err) { toast(err.message, 5000); }
+  }
+
+  // long press on a photo starts the selection
+  let pressTimer = null, longPressed = false;
+  $app.addEventListener('pointerdown', (e) => {
+    longPressed = false; // a long press re-renders the grid, so its own click never arrives
+    const ph = e.target.closest('[data-photo]');
+    if (!ph || selecting) return;
+    pressTimer = setTimeout(() => {
+      longPressed = true;
+      selecting = true; selected.clear(); selected.add(ph.dataset.photo);
+      if (navigator.vibrate) navigator.vibrate(20);
+      const y = window.scrollY; viewSite(location.hash.split('/')[2]); window.scrollTo(0, y);
+    }, 500);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave', 'scroll'].forEach((ev) => $app.addEventListener(ev, () => clearTimeout(pressTimer), { passive: true }));
+  $app.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-photo]')) e.preventDefault(); });
 
   async function boot() {
     try { await load(); } catch (e) { if (e.status === 401) return; toast('Server nicht erreichbar – Fotos werden auf dem Gerät gesammelt', 5000); state.user = state.user || 'offline'; }
